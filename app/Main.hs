@@ -1,11 +1,11 @@
 {-# LANGUAGE OverloadedStrings #-}
 module Main where
 
+import Control.Concurrent -- forkIO
+import Control.Monad (forever)
+import Data.ByteString
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
-import Control.Concurrent -- forkIO
-import Data.ByteString
-import Control.Monad (forever)
 
 type Msg = ByteString
 
