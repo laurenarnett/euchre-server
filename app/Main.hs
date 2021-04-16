@@ -35,8 +35,6 @@ mainLoop sock = do
   _ <- send conn3 ("hello, you are player 3\n")
   (conn4, addr4) <- accept sock
   _ <- send conn4 ("hello, you are player 4\n")
-  resp2 <- strip <$> recv conn2 256
-  -- playEuchre (Player addr1 conn1 Nothing)
   let player1 = Player addr1 conn1 Nothing
       player2 = Player addr2 conn2 Nothing
       player3 = Player addr3 conn3 Nothing

@@ -32,9 +32,17 @@ data Team = Team
 
 type PlayerId = SockAddr
 
+data Round = Round
+  { roundNum :: Int,
+    subroundNum :: Int,
+    trumpSuit :: Suit,
+    callingTeam :: Int,
+    leaderPlayer :: Int
+  }
+
 data EuchreState = EuchreState
   { team1 :: Team,
     team2 :: Team,
-    round :: Int
+    round :: Round
   }
   deriving (Show)
