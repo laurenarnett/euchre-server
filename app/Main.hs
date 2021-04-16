@@ -11,6 +11,7 @@ import Data.ByteString
 import Data.ByteString.Char8 (strip)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
+import Euchre
 
 type Msg = ByteString
 
@@ -35,9 +36,21 @@ mainLoop sock = do
   (conn4, addr4) <- accept sock
   _ <- send conn4 ("hello, you are player 4\n")
   resp2 <- strip <$> recv conn2 256
-  forM_ [conn1, conn2, conn3, conn4] $ \conn ->
-    send conn (resp2 <> " <- player 2's name\n")
+  -- playEuchre (Player addr1 conn1 Nothing)
+  let player1 = Player addr1 conn1 Nothing
+      player2 = Player addr2 conn2 Nothing
+      player3 = Player addr3 conn3 Nothing
+      player4 = Player addr4 conn4 Nothing
+      team1 = Team player1 player3 0
+      team2 = Team player2 player4 0
+      euchreState = EuchreState team1 team2 0
+    in playEuchre euchreState
+
   close conn1
   close conn2
   close conn3
   close conn4
+
+playEuchre :: EuchreState -> IO ()
+playEuchre euchreState = do
+  return ()
