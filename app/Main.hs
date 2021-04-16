@@ -1,4 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE NumDecimals #-}
 module Main where
 
 import Relude
@@ -7,6 +8,7 @@ import Control.Concurrent -- forkIO
 import Control.Exception
 import Control.Monad (forever)
 import Data.ByteString
+import Data.ByteString.Char8 (strip)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 
@@ -17,40 +19,25 @@ main = do
   sock <- socket AF_INET Stream 0 -- create socket
   setSocketOption sock ReuseAddr 1 -- allow socket to be reused immediately
   bind sock (SockAddrInet 4242 (tupleToHostAddress (0x7f, 0, 0, 1))) -- listen on 127.0.0.1 & TCP port 4242
-  listen sock 2 -- set a max of 2 queued connections
-  chan <- newChan
-  forkIO $ forever $ do
-    readChan chan
-  mainLoop sock chan 0
-
-mainLoop :: Socket -> Chan Msg -> Int -> IO ()
-mainLoop sock chan msgNum = do
-  conn <- accept sock -- accept a connection and handle it
-  threadId <- forkIO (runConn conn chan msgNum) -- run euchre server's logic
-  mainLoop sock chan (msgNum + 1) -- repeat
-
-runConn :: (Socket, SockAddr) -> Chan Msg -> Int -> IO ()
-runConn (sock, sa) chan msgNum = do
-  let broadcast msg = writeChan chan msg
-  commLine <- dupChan chan
-  broadcast ("--> " <> show sa <> " entered chat.")
-
-  -- fork off a thread for reading from the duplicated channel
-  reader <- forkIO $ forever $ do
-    line <- readChan commLine
-    send sock line
-
-  -- read lines from the socket and echo back to user
-  let loop = do
-          line <- recv sock 256
-          case line of
-            "quit\n" -> broadcast "see ya"
-            "quit\r\n" -> broadcast "see ya"
-            _ -> broadcast (show line) >>  loop
-
-  loop
-  -- handle (\(SomeException _) -> return ()) loop
-
-  killThread reader
-  broadcast ("--> " <> show sa <> " left chat.")
+  listen sock 4 -- allow socket to be reused immediately by 4 connections
+  mainLoop sock
   close sock
+
+mainLoop :: Socket -> IO ()
+mainLoop sock = do
+  (conn1, addr1) <- accept sock
+  _ <- send conn1 ("hello, you are player 1\n")
+  (conn2, addr2) <- accept sock
+  _ <- send conn2 ("hello, you are player 2\n")
+  _ <- send conn2 ("what is your name?\n")
+  (conn3, addr3) <- accept sock
+  _ <- send conn3 ("hello, you are player 3\n")
+  (conn4, addr4) <- accept sock
+  _ <- send conn4 ("hello, you are player 4\n")
+  resp2 <- strip <$> recv conn2 256
+  forM_ [conn1, conn2, conn3, conn4] $ \conn ->
+    send conn (resp2 <> " <- player 2's name\n")
+  close conn1
+  close conn2
+  close conn3
+  close conn4
