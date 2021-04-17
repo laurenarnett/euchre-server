@@ -1,8 +1,11 @@
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE NumDecimals #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 
 module Main where
 
@@ -84,33 +87,50 @@ setNthPlayer st n field val =
 playRound :: EuchreState -> IO EuchreState
 playRound st = do
   [h1, h2, h3, h4, (top:kitty)] <- dealCards
-  let [p1, p2, p3, p4] = take 4 $ iterate inc (st ^. round . leaderPlayer)
+  let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
 
-  broadcast st [i|Top car: #{top}|]
-  broadcast st [i|Player #{p1}, would you like to tell player #{p4} to pick up the #{top}? [y/n]|]
-  resp1 <- recv (getNthPlayer st p1 ^. playerConn) 256
-  -- case strip resp1 of
-  --   "y"
+  broadcast st [i|Top card: #{top}|]
+  st' <- trumpSelection st top players
 
   pure st
 
 inc :: Int -> Int
 inc player = (player `mod` 4) + 1
 
-offerCard st dealer offeree | dealer == offeree = do
-  broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-  resp <- recv (getNthPlayer st offeree ^. playerConn) 256
-  case strip resp of
-    "n" -> chooseYourOwnTrump
-    "y" -> undefined
-offerCard st dealer offeree = do
-  broadcast st [i|Player #{offeree}, would you like to tell player #{dealer} to pick up the card? [y/n]|]
-  resp <- recv (getNthPlayer st offeree ^. playerConn) 256
-  case strip resp of
-    "n" -> offerCard st dealer (inc offeree)
+trumpSelection :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
+trumpSelection st top players = do
+  (st', complete) <- offer st top players
+  return st'
 
-trumpSelection :: EuchreState -> IO EuchreState
-trumpSelection st = pure st
+offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (EuchreState, Bool)
+offer st top [p1, p2, p3, p4] = offerCard st top p1 p2
+  where
+    offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (EuchreState, Bool)
+    offerCard st top dealer offeree | dealer == offeree = do
+      broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
+      resp <- recv (getNthPlayer st offeree ^. playerConn) 256
+      case strip resp of
+        "n" -> pure (st, False) -- trumpSelection begins chooseYourOwnTrump
+        "y" -> (, True) <$> pickUpCard st top dealer -- dealer picks up the card
+    offerCard st top dealer offeree = do
+      broadcast st [i|Player #{offeree}, would you like to tell player #{dealer} to pick up the card? [y/n]|]
+      resp <- recv (getNthPlayer st offeree ^. playerConn) 256
+      case strip resp of
+        "n" -> offerCard st top dealer (inc offeree)
+
+-- chooseYourOwnTrump :: EuchreState
+-- chooseYourOwnTrump st dealer offeree top
+
+pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
+pickUpCard st top dealerPos =
+  let dealer = getNthPlayer st dealerPos
+      dealerConn = dealer ^. playerConn
+      dealerHand = dealer ^. hand in
+    do send dealerConn [i|"This is your hand: #{dealerHand}\nWhich card would you like to replace?"|]
+       resp <- recv dealerConn 256
+       let st' = setNthPlayer st dealerPos hand (top : dealerHand)
+       -- TODO: parse card to remove and remove card from hand
+       pure st'
 
 dealCards :: IO [Hand]
 dealCards = do
