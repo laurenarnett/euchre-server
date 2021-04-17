@@ -12,6 +12,8 @@ import Data.ByteString.Char8 (strip)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre
+import System.Random.Shuffle
+import Data.List.Split
 
 type Msg = ByteString
 
@@ -41,7 +43,8 @@ mainLoop sock = do
       player4 = Player addr4 conn4 Nothing
       team1 = Team player1 player3 0
       team2 = Team player2 player4 0
-      euchreState = EuchreState team1 team2 0
+      round = Round 0 0 Nothing 0 0
+      euchreState = EuchreState team1 team2 round
     in playEuchre euchreState
 
   close conn1
@@ -52,3 +55,9 @@ mainLoop sock = do
 playEuchre :: EuchreState -> IO ()
 playEuchre euchreState = do
   return ()
+
+dealCards :: IO [Hand]
+dealCards = do
+  cards <- shuffleM allCards
+  let chunks = chunksOf 5 cards
+  pure $ fmap Hand chunks

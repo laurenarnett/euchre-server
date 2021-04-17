@@ -1,20 +1,20 @@
 -- |
 
-module Euchre
-  ( EuchreState (..),
-    Team (..),
-    Player (..)
-  )
-where
+module Euchre where
 
 import Relude
 import Network.Socket
 
-data Suit = Spades | Diamonds | Hearts | Clubs deriving (Show, Eq)
+data Suit = Spades | Diamonds | Hearts | Clubs
+  deriving (Show, Eq, Ord, Enum)
 
-data CardValue = Right | Left | Ace | King | Queen | Jack | Ten | Nine deriving (Show, Eq)
+data CardValue = Ace | King | Queen | Jack | Ten | Nine
+  deriving (Show, Eq, Ord, Enum)
 
-newtype Hand = Hand [(Suit, CardValue)] deriving (Show) -- newtype is a type constructor of a single element
+allCards :: [(CardValue, Suit)]
+allCards = (,) <$> [Ace .. Nine] <*> [Spades .. Clubs]
+
+newtype Hand = Hand [(CardValue, Suit)] deriving (Show) -- newtype is a type constructor of a single element
 
 data Player = Player
   { playerId :: SockAddr,
@@ -35,10 +35,11 @@ type PlayerId = SockAddr
 data Round = Round
   { roundNum :: Int,
     subroundNum :: Int,
-    trumpSuit :: Suit,
+    trumpSuit :: Maybe Suit,
     callingTeam :: Int,
     leaderPlayer :: Int
   }
+  deriving (Show)
 
 data EuchreState = EuchreState
   { team1 :: Team,
