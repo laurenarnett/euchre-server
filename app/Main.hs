@@ -12,6 +12,7 @@ module Main where
 import Relude hiding (round)
 
 import Control.Lens
+import Control.Lens.Regex.ByteString
 import Control.Concurrent -- forkIO
 import Control.Exception
 import Control.Monad (forever)
@@ -146,3 +147,27 @@ broadcast st msg = forM_ conns $ \conn -> send conn (msg <> "\n")
             , st ^. team2 . player1 . playerConn
             , st ^. team2 . player2 . playerConn
             ]
+
+parse :: ByteString -> Maybe (CardValue, Suit)
+parse bs =
+  let suit =
+        case bs ^.. [regex|s|d|c|h|] . match of
+          ["s"] -> Just Spades
+          ["d"] -> Just Diamonds
+          ["c"] -> Just Clubs
+          ["h"] -> Just Hearts
+          _ -> Nothing
+      cardValue =
+        case bs ^.. [regex|9|10|j|q|k|a|] . match of
+          ["9"]  -> Just Nine
+          ["10"] -> Just Ten
+          ["j"]  -> Just Jack
+          ["q"]  -> Just Queen
+          ["k"]  -> Just King
+          ["a"]  -> Just Ace
+          _ -> Nothing
+    in
+    case suit of Just s ->
+                   case cardValue of Just v -> Just (v, s)
+                                     _ -> Nothing
+                 _ -> Nothing

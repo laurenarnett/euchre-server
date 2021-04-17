@@ -22,3 +22,9 @@ each round:
     i) 1 point if their team called it
     ii) 2 points if the other team called it
     iii) 4 points if loner
+
+Input:
+
+s, d, c, h -> spades, diamonds, clubs, hearts
+
+9, 10, j, q, k, a

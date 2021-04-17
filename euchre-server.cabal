@@ -44,6 +44,7 @@ executable euchre-server
                     , bytestring
                     , relude
                     , lens
+                    , lens-regex-pcre
                     , random-shuffle
                     , split
                     , string-interpolate
