@@ -1,9 +1,11 @@
+{-# LANGUAGE TemplateHaskell #-}
 -- |
 
 module Euchre where
 
 import Relude
 import Network.Socket
+import Control.Lens
 
 data Suit = Spades | Diamonds | Hearts | Clubs
   deriving (Show, Eq, Ord, Enum)
@@ -14,36 +16,41 @@ data CardValue = Ace | King | Queen | Jack | Ten | Nine
 allCards :: [(CardValue, Suit)]
 allCards = (,) <$> [Ace .. Nine] <*> [Spades .. Clubs]
 
-newtype Hand = Hand [(CardValue, Suit)] deriving (Show) -- newtype is a type constructor of a single element
+type Hand = [(CardValue, Suit)]
 
 data Player = Player
-  { playerId :: SockAddr,
-    playerConn :: Socket,
-    hand :: Maybe Hand
+  { _playerId :: SockAddr,
+    _playerConn :: Socket,
+    _hand :: Maybe Hand
   }
   deriving (Show)
 
 data Team = Team
-  { player1 :: Player,
-    player2 :: Player,
-    points :: Int
+  { _player1 :: Player,
+    _player2 :: Player,
+    _points :: Int
   }
   deriving (Show)
 
 type PlayerId = SockAddr
 
 data Round = Round
-  { roundNum :: Int,
-    subroundNum :: Int,
-    trumpSuit :: Maybe Suit,
-    callingTeam :: Int,
-    leaderPlayer :: Int
+  { _roundNum :: Int,
+    _subroundNum :: Int,
+    _trumpSuit :: Maybe Suit,
+    _callingTeam :: Int,
+    _leaderPlayer :: Int
   }
   deriving (Show)
 
 data EuchreState = EuchreState
-  { team1 :: Team,
-    team2 :: Team,
-    round :: Round
+  { _team1 :: Team,
+    _team2 :: Team,
+    _round :: Round
   }
   deriving (Show)
+
+makeLenses ''Player
+makeLenses ''Round
+makeLenses ''Team
+makeLenses ''EuchreState
