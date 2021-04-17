@@ -74,6 +74,13 @@ getNthPlayer st n =
             3 -> st ^. team2 . player1
             4 -> st ^. team2 . player2
 
+setNthPlayer :: (Eq a1, Num a1) => EuchreState -> a1 -> Lens' Player b -> b -> EuchreState
+setNthPlayer st n field val =
+  case n of 1 -> st & team1 . player1 . field .~ val
+            2 -> st & team1 . player2 . field .~ val
+            3 -> st & team2 . player1 . field .~ val
+            4 -> st & team2 . player2 . field .~ val
+
 playRound :: EuchreState -> IO EuchreState
 playRound st = do
   [h1, h2, h3, h4, (top:kitty)] <- dealCards
