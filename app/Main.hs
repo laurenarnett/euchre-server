@@ -125,16 +125,13 @@ offer st top [p1, p2, p3, p4] = offerCard st top p1 p2
 -- chooseYourOwnTrump st dealer offeree top
 
 pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
-pickUpCard st top dealerPos =
+pickUpCard st top dealerPos = do
   let dealer = getNthPlayer st dealerPos
       dealerConn = dealer ^. playerConn
       dealerHand = dealer ^. hand
-    in
-    do
-    st' <- do
-      cardToReplace <- getCardToReplace dealerConn dealerHand
-      pure $ setNthPlayer st dealerPos hand (top : (delete cardToReplace dealerHand))
-    pure st'
+  cardToReplace <- getCardToReplace dealerConn dealerHand
+  let newHand = top : (delete cardToReplace dealerHand)
+  pure $ setNthPlayer st dealerPos hand newHand
   where
     getCardToReplace dealerConn dealerHand = do
       send dealerConn [i|"This is your hand: #{dealerHand}\nWhich card would you like to replace?"|]
