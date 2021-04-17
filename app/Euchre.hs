@@ -21,7 +21,7 @@ type Hand = [(CardValue, Suit)]
 data Player = Player
   { _playerId :: SockAddr,
     _playerConn :: Socket,
-    _hand :: Maybe Hand
+    _hand :: Hand
   }
   deriving (Show)
 

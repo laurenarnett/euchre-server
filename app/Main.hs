@@ -42,10 +42,10 @@ mainLoop sock = do
   _ <- send conn3 ("hello, you are player 3\n")
   (conn4, addr4) <- accept sock
   _ <- send conn4 ("hello, you are player 4\n")
-  let player1 = Player addr1 conn1 Nothing
-      player2 = Player addr2 conn2 Nothing
-      player3 = Player addr3 conn3 Nothing
-      player4 = Player addr4 conn4 Nothing
+  let player1 = Player addr1 conn1 []
+      player2 = Player addr2 conn2 []
+      player3 = Player addr3 conn3 []
+      player4 = Player addr4 conn4 []
       team1 = Team player1 player3 0
       team2 = Team player2 player4 0
       round = Round 0 0 Nothing 1 2
