@@ -21,6 +21,7 @@ import Network.Socket -- assumes utf-encoded chars, so incorrectly represents bi
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre
 import System.Random.Shuffle
+import Data.List
 import Data.List.Split
 import Data.String.Interpolate
 
@@ -118,6 +119,7 @@ offer st top [p1, p2, p3, p4] = offerCard st top p1 p2
       resp <- recv (getNthPlayer st offeree ^. playerConn) 256
       case strip resp of
         "n" -> offerCard st top dealer (inc offeree)
+        "y" -> undefined
 
 -- chooseYourOwnTrump :: EuchreState
 -- chooseYourOwnTrump st dealer offeree top
@@ -126,12 +128,24 @@ pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
 pickUpCard st top dealerPos =
   let dealer = getNthPlayer st dealerPos
       dealerConn = dealer ^. playerConn
-      dealerHand = dealer ^. hand in
-    do send dealerConn [i|"This is your hand: #{dealerHand}\nWhich card would you like to replace?"|]
-       resp <- recv dealerConn 256
-       let st' = setNthPlayer st dealerPos hand (top : dealerHand)
-       -- TODO: parse card to remove and remove card from hand
-       pure st'
+      dealerHand = dealer ^. hand
+    in
+    do
+    st' <- do
+      cardToReplace <- getCardToReplace dealerConn dealerHand
+      pure $ setNthPlayer st dealerPos hand (top : (delete cardToReplace dealerHand))
+    pure st'
+  where
+    getCardToReplace dealerConn dealerHand = do
+      send dealerConn [i|"This is your hand: #{dealerHand}\nWhich card would you like to replace?"|]
+      resp <- recv dealerConn 256
+      traceShowM resp
+      case parse (strip resp) of
+        Just card -> pure card
+        Nothing -> do
+          send dealerConn "Failed to parse card entered."
+          getCardToReplace dealerConn dealerHand
+
 
 dealCards :: IO [Hand]
 dealCards = do
