@@ -151,14 +151,23 @@ dealCards = do
   let chunks = chunksOf 5 cards
   pure $ chunks
 
+playerConns :: EuchreState -> [Socket]
+playerConns st = [ st ^. team1 . player1 . playerConn
+                 , st ^. team1 . player2 . playerConn
+                 , st ^. team2 . player1 . playerConn
+                 , st ^. team2 . player2 . playerConn
+                 ]
+
 broadcast :: EuchreState -> ByteString -> IO ()
-broadcast st msg = forM_ conns $ \conn -> send conn (msg <> "\n")
-  where
-    conns = [ st ^. team1 . player1 . playerConn
-            , st ^. team1 . player2 . playerConn
-            , st ^. team2 . player1 . playerConn
-            , st ^. team2 . player2 . playerConn
-            ]
+broadcast st msg = forM_ (playerConns st) $ \conn -> send conn (msg <> "\n")
+
+broadcastMsgs :: EuchreState -> [ByteString] -> IO ()
+broadcastMsgs st [m1, m2, m3, m4] = do
+  let [c1, c2, c3, c4] = playerConns st
+  void $ send c1 (m1 <> "\n")
+  void $ send c2 (m2 <> "\n")
+  void $ send c3 (m3 <> "\n")
+  void $ send c4 (m4 <> "\n")
 
 parse :: ByteString -> Maybe (CardValue, Suit)
 parse bs =
