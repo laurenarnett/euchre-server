@@ -117,21 +117,29 @@ trumpSelection st top players = do
   return st'
 
 offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (EuchreState, Bool)
-offer st top [p1, p2, p3, p4] = offerCard st top p1 p2
+offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
   where
     offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (EuchreState, Bool)
-    offerCard st top dealer offeree | dealer == offeree = do
+    offerCard st top dealer offerer | dealer == offerer = do
       broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-      resp <- recv (getNthPlayer st offeree ^. playerConn) 256
+      resp <- recv (getNthPlayer st offerer ^. playerConn) 256
       case strip resp of
-        "n" -> pure (st, False) -- trumpSelection begins chooseYourOwnTrump
-        "y" -> (, True) <$> pickUpCard st top dealer -- dealer picks up the card
-    offerCard st top dealer offeree = do
-      broadcast st [i|Player #{offeree}, would you like to tell player #{dealer} to pick up the card? [y/n]|]
-      resp <- recv (getNthPlayer st offeree ^. playerConn) 256
+        "n" -> do
+          broadcast st [i|Player #{dealer} passed.|]
+          pure (st, False) -- TODO: trumpSelection begins chooseYourOwnTrump
+        "y" -> do
+          broadcast st [i|Player #{dealer} picked up the card.|]
+          (, True) <$> pickUpCard st top dealer
+    offerCard st top dealer offerer = do
+      broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
+      resp <- recv (getNthPlayer st offerer ^. playerConn) 8
       case strip resp of
-        "n" -> offerCard st top dealer (inc offeree)
-        "y" -> undefined
+        "n" -> do
+          broadcast st [i|Player #{offerer} passed.|]
+          offerCard st top dealer (inc offerer) -- ask next player
+        "y" -> do
+          broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
+          (, True) <$> pickUpCard st top dealer
 
 -- chooseYourOwnTrump :: EuchreState
 -- chooseYourOwnTrump st dealer offeree top
