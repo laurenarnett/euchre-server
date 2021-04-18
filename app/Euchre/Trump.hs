@@ -14,25 +14,26 @@ import Data.List
 
 trumpSelection :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
 trumpSelection st top players = do
-  (st', complete) <- offer st top players
-  if complete then return st' else do
-    (st'', complete) <- chooseYourOwnTrump st top players
-    return st''
+  -- maybe (chooseYourOwnTrump st top players) pure =<< (offer st top players)
+  offerRes <- offer st top players
+  case offerRes of
+    Just st' -> pure st'
+    Nothing -> chooseYourOwnTrump st top players
 
-offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (EuchreState, Bool)
+offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (Maybe EuchreState)
 offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
   where
-    offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (EuchreState, Bool)
+    offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (Maybe EuchreState)
     offerCard st top dealer offerer | dealer == offerer = do
       broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
       resp <- recv (getNthPlayer st dealer ^. playerConn) 256
       case strip resp of
         "n" -> do
           broadcast st [i|Player #{dealer} passed.|]
-          pure (st, False) -- TODO: trumpSelection begins chooseYourOwnTrump
+          pure Nothing -- TODO: trumpSelection begins chooseYourOwnTrump
         "y" -> do
           broadcast st [i|Player #{dealer} picked up the card.|]
-          (, True) <$> pickUpCard st top dealer
+          Just <$> pickUpCard st top dealer
     offerCard st top dealer offerer = do
       broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
       resp <- recv (getNthPlayer st offerer ^. playerConn) 8
@@ -42,7 +43,7 @@ offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
           offerCard st top dealer (inc offerer) -- ask next player
         "y" -> do
           broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
-          (, True) <$> pickUpCard st top dealer
+          Just <$> pickUpCard st top dealer
 
 chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
 chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSuit p4 p1
