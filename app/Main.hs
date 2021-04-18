@@ -131,19 +131,18 @@ pickUpCard st top dealerPos = do
       dealerConn = dealer ^. playerConn
       dealerHand = dealer ^. hand
   cardToReplace <- getCardToReplace dealerConn dealerHand
-  let newHand = top : (delete cardToReplace dealerHand)
+  let newHand = top : delete cardToReplace dealerHand
+  send dealerConn [i|This is your new hand: #{newHand}\n|]
   pure $ setNthPlayer st dealerPos hand newHand
   where
     getCardToReplace dealerConn dealerHand = do
-      send dealerConn [i|"This is your hand: #{dealerHand}\nWhich card would you like to replace?"|]
+      send dealerConn [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]
       resp <- recv dealerConn 256
-      traceShowM resp
       case parse (strip resp) of
         Just card -> pure card
         Nothing -> do
-          send dealerConn "Failed to parse card entered."
+          send dealerConn "Failed to parse card entered. Try again.\n"
           getCardToReplace dealerConn dealerHand
-
 
 dealCards :: IO [Hand]
 dealCards = do
