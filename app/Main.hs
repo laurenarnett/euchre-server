@@ -1,12 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE NumDecimals #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE QuasiQuotes #-}
-{-# LANGUAGE PartialTypeSignatures #-}
-
 module Main where
 
 import Relude hiding (round)
@@ -18,10 +9,11 @@ import Control.Exception
 import Control.Monad (forever)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
-import Euchre
+import Euchre.Connections
+import Euchre.Types
+import Euchre.Trump
+import Euchre.Utils
 import System.Random.Shuffle
-import qualified Data.ByteString.Char8 as B
-import Data.Char (isSpace)
 import Data.List
 import Data.List.Split
 import Data.String.Interpolate
@@ -41,13 +33,17 @@ main = do
 mainLoop :: Socket -> IO ()
 mainLoop sock = do
   (conn1, addr1) <- accept sock
-  _ <- send conn1 ("hello, you are player 1\n")
+  _ <- send conn1 "Welcome, you are Player 1\n"
+  -- _ <- send conn1 [i|your address is: #{addr1}\n|]
   (conn2, addr2) <- accept sock
-  _ <- send conn2 ("hello, you are player 2\n")
+  _ <- send conn2 "Welcome, you are Player 2\n"
+  -- _ <- send conn2 [i|your address is: #{addr2}\n|]
   (conn3, addr3) <- accept sock
-  _ <- send conn3 ("hello, you are player 3\n")
+  _ <- send conn3 "Welcome, you are Player 3\n"
+  -- _ <- send conn3 [i|your address is: #{addr3}\n|]
   (conn4, addr4) <- accept sock
-  _ <- send conn4 ("hello, you are player 4\n")
+  _ <- send conn4 "Welcome, you are Player 4\n"
+  -- _ <- send conn4 [i|your address is: #{addr4}\n|]
   let player1 = Player addr1 conn1 []
       player2 = Player addr2 conn2 []
       player3 = Player addr3 conn3 []
@@ -74,29 +70,6 @@ playEuchre st = do
   return ()
   -- playEuchre st'
 
-getNthPlayer :: EuchreState -> Int -> Player
-getNthPlayer st n =
-  case n of 1 -> st ^. team1 . player1
-            2 -> st ^. team2 . player1
-            3 -> st ^. team1 . player2
-            4 -> st ^. team2 . player2
-
-setNthPlayer :: (Eq a1, Num a1) => EuchreState -> a1 -> Lens' Player b -> b -> EuchreState
-setNthPlayer st n field val =
-  case n of 1 -> st & team1 . player1 . field .~ val
-            2 -> st & team2 . player1 . field .~ val
-            3 -> st & team1 . player2 . field .~ val
-            4 -> st & team2 . player2 . field .~ val
-
-setHands :: EuchreState -> [Hand] -> EuchreState
-setHands st [h1, h2, h3, h4] =
-  st
-  & (\st' -> setNthPlayer st' 1 hand h1)
-  & (\st' -> setNthPlayer st' 2 hand h1)
-  & (\st' -> setNthPlayer st' 3 hand h3)
-  & (\st' -> setNthPlayer st' 4 hand h4)
-
-
 playRound :: EuchreState -> IO EuchreState
 playRound st = do
   [h1, h2, h3, h4, top:kitty] <- dealCards
@@ -107,109 +80,3 @@ playRound st = do
   st'' <- trumpSelection st' top players
 
   pure st''
-
-inc :: Int -> Int
-inc player = (player `mod` 4) + 1
-
-trumpSelection :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
-trumpSelection st top players = do
-  (st', complete) <- offer st top players
-  return st'
-
-offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (EuchreState, Bool)
-offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
-  where
-    offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (EuchreState, Bool)
-    offerCard st top dealer offerer | dealer == offerer = do
-      broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-      resp <- recv (getNthPlayer st offerer ^. playerConn) 256
-      case strip resp of
-        "n" -> do
-          broadcast st [i|Player #{dealer} passed.|]
-          pure (st, False) -- TODO: trumpSelection begins chooseYourOwnTrump
-        "y" -> do
-          broadcast st [i|Player #{dealer} picked up the card.|]
-          (, True) <$> pickUpCard st top dealer
-    offerCard st top dealer offerer = do
-      broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
-      resp <- recv (getNthPlayer st offerer ^. playerConn) 8
-      case strip resp of
-        "n" -> do
-          broadcast st [i|Player #{offerer} passed.|]
-          offerCard st top dealer (inc offerer) -- ask next player
-        "y" -> do
-          broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
-          (, True) <$> pickUpCard st top dealer
-
--- chooseYourOwnTrump :: EuchreState
--- chooseYourOwnTrump st dealer offeree top
-
-pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
-pickUpCard st top dealerPos = do
-  let dealer = getNthPlayer st dealerPos
-      dealerConn = dealer ^. playerConn
-      dealerHand = dealer ^. hand
-  cardToReplace <- getCardToReplace dealerConn dealerHand
-  let newHand = top : delete cardToReplace dealerHand
-  send dealerConn [i|This is your new hand: #{newHand}\n|]
-  pure $ setNthPlayer st dealerPos hand newHand
-  where
-    getCardToReplace dealerConn dealerHand = do
-      send dealerConn [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]
-      resp <- recv dealerConn 256
-      case parse (strip resp) of
-        Just card -> pure card
-        Nothing -> do
-          send dealerConn "Failed to parse card entered. Try again.\n"
-          getCardToReplace dealerConn dealerHand
-
-dealCards :: IO [Hand]
-dealCards = do
-  cards <- shuffleM allCards
-  let chunks = chunksOf 5 cards
-  pure $ chunks
-
-playerConns :: EuchreState -> [Socket]
-playerConns st = [ st ^. team1 . player1 . playerConn
-                 , st ^. team1 . player2 . playerConn
-                 , st ^. team2 . player1 . playerConn
-                 , st ^. team2 . player2 . playerConn
-                 ]
-
-broadcast :: EuchreState -> ByteString -> IO ()
-broadcast st msg = forM_ (playerConns st) $ \conn -> send conn (msg <> "\n")
-
-broadcastMsgs :: EuchreState -> [ByteString] -> IO ()
-broadcastMsgs st [m1, m2, m3, m4] = do
-  let [c1, c2, c3, c4] = playerConns st
-  void $ send c1 (m1 <> "\n")
-  void $ send c2 (m2 <> "\n")
-  void $ send c3 (m3 <> "\n")
-  void $ send c4 (m4 <> "\n")
-
-parse :: ByteString -> Maybe (CardValue, Suit)
-parse bs =
-  let suit =
-        case bs ^.. [regex|s|d|c|h|] . match of
-          ["s"] -> Just Spades
-          ["d"] -> Just Diamonds
-          ["c"] -> Just Clubs
-          ["h"] -> Just Hearts
-          _ -> Nothing
-      cardValue =
-        case bs ^.. [regex|9|10|j|q|k|a|] . match of
-          ["9"]  -> Just Nine
-          ["10"] -> Just Ten
-          ["j"]  -> Just Jack
-          ["q"]  -> Just Queen
-          ["k"]  -> Just King
-          ["a"]  -> Just Ace
-          _ -> Nothing
-    in
-    case suit of Just s ->
-                   case cardValue of Just v -> Just (v, s)
-                                     _ -> Nothing
-                 _ -> Nothing
-
-strip :: ByteString -> ByteString
-strip = B.reverse . B.dropWhile isSpace . B.reverse

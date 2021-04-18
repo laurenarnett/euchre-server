@@ -1,7 +1,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 -- |
 
-module Euchre where
+module Euchre.Types where
 
 import Relude
 import Network.Socket

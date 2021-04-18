@@ -35,7 +35,10 @@ executable euchre-server
 
     -- Modules included in this executable, other than Main.
     other-modules:
-        Euchre
+        Euchre.Connections
+        Euchre.Types
+        Euchre.Trump
+        Euchre.Utils
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -51,3 +54,10 @@ executable euchre-server
     hs-source-dirs:   app
     default-language: Haskell2010
     default-extensions: NoImplicitPrelude
+                        RankNTypes
+                        QuasiQuotes
+                        OverloadedStrings
+                        TupleSections
+                        FlexibleContexts
+                        NumDecimals
+                        MultiWayIf
