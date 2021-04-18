@@ -16,11 +16,12 @@ import Control.Lens.Regex.ByteString
 import Control.Concurrent -- forkIO
 import Control.Exception
 import Control.Monad (forever)
-import Data.ByteString.Char8 (strip)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre
 import System.Random.Shuffle
+import qualified Data.ByteString.Char8 as B
+import Data.Char (isSpace)
 import Data.List
 import Data.List.Split
 import Data.String.Interpolate
@@ -182,3 +183,6 @@ parse bs =
                    case cardValue of Just v -> Just (v, s)
                                      _ -> Nothing
                  _ -> Nothing
+
+strip :: ByteString -> ByteString
+strip = B.reverse . B.dropWhile isSpace . B.reverse

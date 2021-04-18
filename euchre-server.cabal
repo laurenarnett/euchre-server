@@ -39,13 +39,13 @@ executable euchre-server
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.14.1.0
-                    , network
+    build-depends:    base >=4.13.0.0
                     , bytestring
-                    , relude
                     , lens
                     , lens-regex-pcre
+                    , network
                     , random-shuffle
+                    , relude
                     , split
                     , string-interpolate
     hs-source-dirs:   app
