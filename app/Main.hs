@@ -67,11 +67,12 @@ playEuchre :: EuchreState -> IO ()
 playEuchre st = do
   let t1points = st ^. team1 . points
       t2points = st ^. team2 . points
-  if | t1points >= 10 -> broadcast st "team 1 wins"
-     | t2points >= 10 -> broadcast st "team 2 wins"
-     | otherwise -> do
-         st' <- playRound st
-         playEuchre st'
+  -- if | t1points >= 10 -> broadcast st "team 1 wins"
+  --    | t2points >= 10 -> broadcast st "team 2 wins"
+  --    | otherwise -> do
+  st' <- playRound st
+  return ()
+  -- playEuchre st'
 
 getNthPlayer :: EuchreState -> Int -> Player
 getNthPlayer st n =
