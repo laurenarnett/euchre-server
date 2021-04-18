@@ -87,15 +87,25 @@ setNthPlayer st n field val =
             3 -> st & team1 . player2 . field .~ val
             4 -> st & team2 . player2 . field .~ val
 
+setHands :: EuchreState -> [Hand] -> EuchreState
+setHands st [h1, h2, h3, h4] =
+  st
+  & (\st' -> setNthPlayer st' 1 hand h1)
+  & (\st' -> setNthPlayer st' 2 hand h1)
+  & (\st' -> setNthPlayer st' 3 hand h3)
+  & (\st' -> setNthPlayer st' 4 hand h4)
+
+
 playRound :: EuchreState -> IO EuchreState
 playRound st = do
-  [h1, h2, h3, h4, (top:kitty)] <- dealCards
+  [h1, h2, h3, h4, top:kitty] <- dealCards
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
+      st' = setHands st [h1, h2, h3, h4]
+  broadcastMsgs st [show h1, show h2, show h3, show h4]
+  broadcast st' [i|Top card: #{top}|]
+  st'' <- trumpSelection st' top players
 
-  broadcast st [i|Top card: #{top}|]
-  st' <- trumpSelection st top players
-
-  pure st
+  pure st''
 
 inc :: Int -> Int
 inc player = (player `mod` 4) + 1
