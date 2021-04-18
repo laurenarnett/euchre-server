@@ -5,7 +5,7 @@ module Euchre.Trump where
 import Control.Lens
 import Euchre.Types
 import Euchre.Connections
-import Relude
+import Relude hiding (round)
 import Data.String.Interpolate
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
@@ -25,7 +25,7 @@ offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
     offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (EuchreState, Bool)
     offerCard st top dealer offerer | dealer == offerer = do
       broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-      resp <- recv (getNthPlayer st offerer ^. playerConn) 256
+      resp <- recv (getNthPlayer st dealer ^. playerConn) 256
       case strip resp of
         "n" -> do
           broadcast st [i|Player #{dealer} passed.|]
@@ -44,8 +44,24 @@ offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
           broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
           (, True) <$> pickUpCard st top dealer
 
-chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (EuchreState, Bool)
-chooseYourOwnTrump st top players = undefined
+chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
+chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSuit p4 p1
+  where
+    offerChoice :: EuchreState -> Suit -> Int -> Int -> IO EuchreState
+    offerChoice st topSuit dealer offerer | dealer == offerer = do
+      broadcast st [i|Player #{dealer}, which suit would you like? [s/c/d/h]|]
+      resp <- recv (getNthPlayer st dealer ^. playerConn) 256
+      case validateTrump topSuit resp of
+        Just suit -> do
+          broadcast st [i|Player #{dealer} chooses #{suit}|]
+          pure st
+
+        
+validateTrump :: Suit -> ByteString -> Maybe Suit
+validateTrump topSuit resp = undefined
+
+  
+  
 
 pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
 pickUpCard st top dealerPos = do
@@ -55,7 +71,7 @@ pickUpCard st top dealerPos = do
   cardToReplace <- getCardToReplace dealerConn dealerHand
   let newHand = top : delete cardToReplace dealerHand
   send dealerConn [i|This is your new hand: #{newHand}\n|]
-  pure $ setNthPlayer st dealerPos hand newHand
+  pure $ setNthPlayer st dealerPos hand newHand & (\st' -> st' & round . trumpSuit .~ snd top)
   where
     getCardToReplace dealerConn dealerHand = do
       send dealerConn [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]

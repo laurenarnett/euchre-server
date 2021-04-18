@@ -37,7 +37,7 @@ type PlayerId = SockAddr
 data Round = Round
   { _roundNum :: Int,
     _subroundNum :: Int,
-    _trumpSuit :: Maybe Suit,
+    _trumpSuit :: Suit,
     _callingTeam :: Int,
     _leaderPlayer :: Int
   }

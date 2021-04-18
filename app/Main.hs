@@ -50,7 +50,7 @@ mainLoop sock = do
       player4 = Player addr4 conn4 []
       team1 = Team player1 player3 0
       team2 = Team player2 player4 0
-      round = Round 0 0 Nothing 1 2
+      round = Round 0 0 Hearts 1 2
       euchreState = EuchreState team1 team2 round
     in playEuchre euchreState
 
