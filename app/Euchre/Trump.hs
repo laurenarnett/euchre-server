@@ -22,28 +22,34 @@ trumpSelection st top players = do
 
 offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (Maybe EuchreState)
 offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
-  where
-    offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (Maybe EuchreState)
-    offerCard st top dealer offerer | dealer == offerer = do
-      broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-      resp <- recv (getNthPlayer st dealer ^. playerConn) 256
-      case strip resp of
-        "n" -> do
-          broadcast st [i|Player #{dealer} passed.|]
-          pure Nothing -- TODO: trumpSelection begins chooseYourOwnTrump
-        "y" -> do
-          broadcast st [i|Player #{dealer} picked up the card.|]
-          Just <$> pickUpCard st top dealer
-    offerCard st top dealer offerer = do
-      broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
-      resp <- recv (getNthPlayer st offerer ^. playerConn) 8
-      case strip resp of
-        "n" -> do
-          broadcast st [i|Player #{offerer} passed.|]
-          offerCard st top dealer (inc offerer) -- ask next player
-        "y" -> do
-          broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
-          Just <$> pickUpCard st top dealer
+
+offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (Maybe EuchreState)
+offerCard st top dealer offerer | dealer == offerer = do
+  broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
+  resp <- recv (getNthPlayer st dealer ^. playerConn) 256
+  case strip resp of
+    "n" -> do
+      broadcast st [i|Player #{dealer} passed.|]
+      pure Nothing -- TODO: trumpSelection begins chooseYourOwnTrump
+    "y" -> do
+      broadcast st [i|Player #{dealer} picked up the card.|]
+      Just <$> pickUpCard st top dealer
+    _ -> do
+      sendInvalidInput st dealer
+      offerCard st top dealer offerer
+offerCard st top dealer offerer = do
+  broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
+  resp <- recv (getNthPlayer st offerer ^. playerConn) 256
+  case strip resp of
+    "n" -> do
+      broadcast st [i|Player #{offerer} passed.|]
+      offerCard st top dealer (inc offerer) -- ask next player
+    "y" -> do
+      broadcast st [i|Player #{offerer} told Player #{dealer} to pick up the card.|]
+      Just <$> pickUpCard st top dealer
+    _ -> do
+      sendInvalidInput st offerer
+      offerCard st top dealer offerer
 
 chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
 chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSuit p4 p1
