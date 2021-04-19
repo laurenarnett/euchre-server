@@ -53,15 +53,33 @@ offerCard st top dealer offerer = do
 
 chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
 chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSuit p4 p1
-  where
-    offerChoice :: EuchreState -> Suit -> Int -> Int -> IO EuchreState
-    offerChoice st topSuit dealer offerer | dealer == offerer = do
-      broadcast st [i|Player #{dealer}, which suit would you like? [s/c/d/h]|]
-      resp <- recv (getNthPlayer st dealer ^. playerConn) 256
+
+offerChoice :: EuchreState -> Suit -> Int -> Int -> IO EuchreState
+offerChoice st topSuit dealer offerer | dealer == offerer = do
+  broadcast st [i|Player #{dealer}, which suit would you like? [s/c/d/h]|]
+  resp <- recv (getNthPlayer st dealer ^. playerConn) 256
+  case validateTrump topSuit resp of
+    Just suit -> do
+      broadcast st [i|Player #{dealer} chooses #{suit}.|]
+      pure st -- TODO: change the state
+    Nothing -> do
+      sendInvalidInput st dealer
+      offerChoice st topSuit dealer offerer
+offerChoice st topSuit dealer offerer = do
+  broadcast st [i|Player #{offerer}, which suit would you like? [s/c/d/h/pass]|]
+  resp <- recv (getNthPlayer st offerer ^. playerConn) 256
+  case strip resp of
+    "pass" -> do
+      broadcast st [i|Player #{offerer} passed.|]
+      offerChoice st topSuit dealer (inc offerer)
+    _ -> do
       case validateTrump topSuit resp of
-        Just suit -> do
-          broadcast st [i|Player #{dealer} chooses #{suit}|]
-          pure st
+        Just suit -> do -- successfully parsed and validated a suit
+          broadcast st [i|Player #{offerer} chooses #{suit}.|]
+          pure st -- TODO: change the state
+        Nothing -> do
+          sendInvalidInput st offerer
+          offerChoice st topSuit dealer offerer
 
 validateTrump :: Suit -> ByteString -> Maybe Suit
 validateTrump topSuit resp =
