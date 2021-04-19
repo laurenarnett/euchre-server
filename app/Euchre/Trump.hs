@@ -63,12 +63,11 @@ chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSui
           broadcast st [i|Player #{dealer} chooses #{suit}|]
           pure st
 
-        
 validateTrump :: Suit -> ByteString -> Maybe Suit
-validateTrump topSuit resp = undefined
-
-  
-  
+validateTrump topSuit resp =
+  case parseSuit (strip resp) of
+    Just suit | suit /= topSuit -> Just suit
+    _ -> Nothing
 
 pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
 pickUpCard st top dealerPos = do
