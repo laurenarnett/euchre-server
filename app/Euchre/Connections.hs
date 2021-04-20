@@ -33,7 +33,7 @@ broadcastMsgs st [m1, m2, m3, m4] = do
   void $ send c4 (m4 <> "\n")
 
 sendInvalidInput :: EuchreState -> Int -> IO ()
-sendInvalidInput st playerNum = void $ send (getNthPlayer st playerNum ^. playerConn) "Invalid input. Try again."
+sendInvalidInput st playerNum = void $ send (st ^. nthPlayer playerNum . playerConn) "Invalid input. Try again."
 
 parse :: ByteString -> Maybe (CardValue, Suit)
 parse bs =

@@ -11,6 +11,7 @@ import Euchre.Utils
 import Data.String.Interpolate
 import Network.Socket
 import Network.Socket.ByteString
+import qualified Data.List as L
 
 playSubrounds :: EuchreState -> IO EuchreState
 playSubrounds st =
@@ -20,6 +21,7 @@ playSubrounds st =
       let st' = st & round . roundNum %~ (+ 1)
       st'' <- playTrick st'
       broadcast st'' [i|#{st''}|]
+      -- TODO: replace leaderCard with Nothing, table with []
       playSubrounds st''
 
 playTrick :: EuchreState -> IO EuchreState
@@ -29,26 +31,29 @@ playTrick st =
   where
     trump = st ^. round . trumpSuit
     go st player = do
-      let addr = getNthPlayer st player ^. playerConn
+      let addr = st ^. nthPlayer player . playerConn
       send addr "Choose a card to play.\n"
       resp <- recv addr 256
       case parse (strip resp) of
-        Just card -> do
-          broadcast st [i|Player #{player} played #{card}.|]
-          case st ^. round . leaderCard of -- if the leadercard is already set
-            Just leaderCard -> do
-              if validatePlay st card player
-                then --pure $ (setNthPlayer st player )
-                pure $ st & round . table %~ (card : )
-                else do
-                  send (getNthPlayer st player ^. playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
-                  go st player
-            Nothing -> undefined
+        Just card -> playCard st card player
         Nothing -> pure st
+
+playCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
+playCard st card player = do
+  broadcast st [i|Player #{player} played #{card}.|]
+  case st ^. round . leaderCard of -- if the leadercard is already set
+    Just leaderCard -> do
+      if validatePlay st card player
+        then pure $ st & nthPlayer player . hand %~ L.delete card
+                       & (round . table %~ (card :))
+        else do
+          send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
+          pure st
+    Nothing -> undefined
 
 validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
 validatePlay st (_, suit) player =
-  let playerHand = getNthPlayer st player ^. hand
+  let playerHand = st ^. nthPlayer player . hand
       -- trumpSuit = st ^. round . trumpSuit
       leaderSuit = st ^?! round . leaderCard . _Just . _2 -- get the Maybe second tuple element, or throw an exception
       handContainsSuit = leaderSuit `elem` map snd playerHand in
