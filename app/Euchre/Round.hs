@@ -35,5 +35,21 @@ playTrick st =
       case parse (strip resp) of
         Just card -> do
           broadcast st [i|Player #{player} played #{card}.|]
-          pure $ st & round . leaderPlayer .~ player
+          case st ^. round . leaderCard of -- if the leadercard is already set
+            Just leaderCard -> do
+              if validatePlay st card player
+                then --pure $ (setNthPlayer st player )
+                pure $ st & round . table %~ (card : )
+                else do
+                  send (getNthPlayer st player ^. playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
+                  go st player
+            Nothing -> undefined
         Nothing -> pure st
+
+validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
+validatePlay st (_, suit) player =
+  let playerHand = getNthPlayer st player ^. hand
+      -- trumpSuit = st ^. round . trumpSuit
+      leaderSuit = st ^?! round . leaderCard . _Just . _2 -- get the Maybe second tuple element, or throw an exception
+      handContainsSuit = leaderSuit `elem` map snd playerHand in
+  not handContainsSuit || suit == leaderSuit
