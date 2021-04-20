@@ -61,7 +61,7 @@ offerChoice st topSuit dealer offerer | dealer == offerer = do
   case validateTrump topSuit resp of
     Just suit -> do
       broadcast st [i|Player #{dealer} chooses #{suit}.|]
-      pure st -- TODO: change the state
+      pure (st & round . trumpSuit .~ suit)
     Nothing -> do
       sendInvalidInput st dealer
       offerChoice st topSuit dealer offerer
@@ -76,7 +76,7 @@ offerChoice st topSuit dealer offerer = do
       case validateTrump topSuit resp of
         Just suit -> do -- successfully parsed and validated a suit
           broadcast st [i|Player #{offerer} chooses #{suit}.|]
-          pure st -- TODO: change the state
+          pure (st & round . trumpSuit .~ suit)
         Nothing -> do
           sendInvalidInput st offerer
           offerChoice st topSuit dealer offerer
