@@ -46,7 +46,7 @@ parse bs =
 
 parseSuit :: ByteString -> Maybe Suit
 parseSuit bs =
-  case bs ^.. [regex|s|d|c|h|] . match of
+  case strip bs ^.. [regex|s|d|c|h|] . match of
     ["s"] -> Just Spades
     ["d"] -> Just Diamonds
     ["c"] -> Just Clubs
@@ -55,7 +55,7 @@ parseSuit bs =
 
 parseCardValue :: ByteString -> Maybe CardValue
 parseCardValue bs =
-  case bs ^.. [regex|9|10|j|q|k|a|] . match of
+  case strip bs ^.. [regex|9|10|j|q|k|a|] . match of
     ["9"]  -> Just Nine
     ["10"] -> Just Ten
     ["j"]  -> Just Jack

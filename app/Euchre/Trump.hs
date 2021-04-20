@@ -83,7 +83,7 @@ offerChoice st topSuit dealer offerer = do
 
 validateTrump :: Suit -> ByteString -> Maybe Suit
 validateTrump topSuit resp =
-  case parseSuit (strip resp) of
+  case parseSuit resp of
     Just suit | suit /= topSuit -> Just suit
     _ -> Nothing
 
@@ -100,7 +100,7 @@ pickUpCard st top dealerPos = do
     getCardToReplace dealerConn dealerHand = do
       send dealerConn [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]
       resp <- recv dealerConn 256
-      case parse (strip resp) of
+      case parse resp of
         Just card -> pure card
         Nothing -> do
           send dealerConn "Failed to parse card entered. Try again.\n"

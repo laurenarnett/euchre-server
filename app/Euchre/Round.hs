@@ -31,25 +31,25 @@ playTrick st =
   where
     trump = st ^. round . trumpSuit
     go st player = do
-      let addr = st ^. nthPlayer player . playerConn
-      send addr "Choose a card to play.\n"
-      resp <- recv addr 256
-      case parse (strip resp) of
-        Just card -> playCard st card player
-        Nothing -> pure st
 
 playCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
 playCard st card player = do
-  broadcast st [i|Player #{player} played #{card}.|]
-  case st ^. round . leaderCard of -- if the leadercard is already set
-    Just leaderCard -> do
-      if validatePlay st card player
-        then pure $ st & nthPlayer player . hand %~ L.delete card
-                       & (round . table %~ (card :))
-        else do
-          send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
-          pure st
-    Nothing -> undefined
+  let addr = st ^. nthPlayer player . playerConn
+  send addr "Choose a card to play.\n"
+  resp <- recv addr 256
+  case parse resp of
+    Just card -> playCard st card player
+        broadcast st [i|Player #{player} played #{card}.|]
+        case st ^. round . leaderCard of -- if the leadercard is already set
+          Just leaderCard -> do
+            if validatePlay st card player
+              then pure $ st & nthPlayer player . hand %~ L.delete card
+                             & round . table %~ (card :)
+              else do
+                send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
+                pure st
+        Nothing -> undefined
+    Nothing -> pure st
 
 validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
 validatePlay st (_, suit) player =
