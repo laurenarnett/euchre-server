@@ -10,6 +10,7 @@ import Control.Monad (forever)
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre.Connections
+import Euchre.Round
 import Euchre.Types
 import Euchre.Trump
 import Euchre.Utils
@@ -50,7 +51,7 @@ mainLoop sock = do
       player4 = Player addr4 conn4 []
       team1 = Team player1 player3 0
       team2 = Team player2 player4 0
-      round = Round 0 0 Hearts 1 2
+      round = Round 0 0 Hearts 1 2 -- dummy initial round state
       euchreState = EuchreState team1 team2 round
     in playEuchre euchreState
 
@@ -78,5 +79,6 @@ playRound st = do
   broadcastMsgs st [show h1, show h2, show h3, show h4]
   broadcast st' [i|Top card: #{top}|]
   st'' <- trumpSelection st' top players
+  st''' <- playSubrounds st''
 
-  pure st''
+  pure st'''

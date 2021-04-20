@@ -36,6 +36,7 @@ executable euchre-server
     -- Modules included in this executable, other than Main.
     other-modules:
         Euchre.Connections
+        Euchre.Round
         Euchre.Types
         Euchre.Trump
         Euchre.Utils

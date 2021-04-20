@@ -2,7 +2,7 @@
 
 module Euchre.Utils where
 
-import Relude
+import Relude hiding (round)
 import Euchre.Types
 import Control.Lens
 import System.Random.Shuffle
@@ -39,3 +39,6 @@ setHands st [h1, h2, h3, h4] =
   & (\st' -> setNthPlayer st' 2 hand h1)
   & (\st' -> setNthPlayer st' 3 hand h3)
   & (\st' -> setNthPlayer st' 4 hand h4)
+
+computePlayerOrder :: EuchreState -> [Int]
+computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
