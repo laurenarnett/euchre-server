@@ -16,7 +16,7 @@ dealCards :: IO [Hand]
 dealCards = do
   cards <- shuffleM allCards
   let chunks = chunksOf 5 cards
-  pure $ chunks
+  pure chunks
 
 getNthPlayer :: EuchreState -> Int -> Player
 getNthPlayer st n =
@@ -26,11 +26,14 @@ getNthPlayer st n =
             4 -> st ^. team2 . player2
 
 setNthPlayer :: (Eq a1, Num a1) => EuchreState -> a1 -> Lens' Player b -> b -> EuchreState
-setNthPlayer st n field val =
-  case n of 1 -> st & team1 . player1 . field .~ val
-            2 -> st & team2 . player1 . field .~ val
-            3 -> st & team1 . player2 . field .~ val
-            4 -> st & team2 . player2 . field .~ val
+setNthPlayer st n field val = applyToNthPlayer st n field (const val)
+
+applyToNthPlayer :: (Eq a1, Num a1) => EuchreState -> a1 -> Lens' Player b -> (b -> b) -> EuchreState
+applyToNthPlayer st n field fn =
+  case n of 1 -> st & team1 . player1 . field %~ fn
+            2 -> st & team2 . player1 . field %~ fn
+            3 -> st & team1 . player2 . field %~ fn
+            4 -> st & team2 . player2 . field %~ fn
 
 setHands :: EuchreState -> [Hand] -> EuchreState
 setHands st [h1, h2, h3, h4] =
