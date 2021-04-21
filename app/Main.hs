@@ -77,8 +77,8 @@ playRound st = do
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
       st' = setHands st [h1, h2, h3, h4] players
   broadcastMsgs st [show h1, show h2, show h3, show h4]
-  broadcast st' [i|Top card: #{top}|]
-  st'' <- trumpSelection st' top players
-  st''' <- playSubrounds st''
+  -- broadcast st' [i|Top card: #{top}|]
+  -- st'' <- trumpSelection st' top players
+  st''' <- playSubrounds st'
 
   pure st'''

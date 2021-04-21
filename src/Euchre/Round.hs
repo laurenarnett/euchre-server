@@ -11,14 +11,14 @@ import Euchre.Utils
 import Data.String.Interpolate
 import Network.Socket
 import Network.Socket.ByteString
-import qualified Data.List as L
+import qualified Data.List as L hiding (elem)
 
 playSubrounds :: EuchreState -> IO EuchreState
 playSubrounds st =
-  case st ^. round . roundNum of
+  case st ^. round . subroundNum of
     5 -> pure st
     _ -> do
-      let st' = st & round . roundNum %~ (+ 1)
+      let st' = st & round . subroundNum %~ (+ 1)
       st'' <- playTrick st'
       broadcast st'' [i|#{st''}|]
       -- TODO: replace leaderCard with Nothing, table with []
@@ -64,3 +64,44 @@ validatePlay st (_, suit) player =
       leaderSuit = st ^?! round . leaderCard . _Just . _2 -- get the Maybe second tuple element, or throw an exception
       handContainsSuit = leaderSuit `elem` map snd playerHand in
   not handContainsSuit || suit == leaderSuit
+
+scoreRound :: EuchreState -> EuchreState
+scoreRound st =
+  let playerOrder = L.reverse $ computePlayerOrder st
+      (winningCard, winningPlayerIndex) =
+        L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder) in
+    st & playerToTeam winningPlayerIndex . points %~ (+ 1) -- TODO: change point value depending on callingTeam
+    where
+      (leaderValue, leaderSuit) = case st ^. round . leaderCard of
+                              Just lCard -> lCard
+      trumpOrder = computeTrumpOrder st
+      orderCards :: (CardValue, Suit) -> (CardValue, Suit) -> Ordering
+      orderCards (c1val, c1suit) (c2val, c2suit) =
+        let c1TrumpIdx = L.elemIndex (c1val, c1suit) trumpOrder
+            c2TrumpIdx = L.elemIndex (c2val, c2suit) trumpOrder in
+          case (c1TrumpIdx, c2TrumpIdx) of
+            (Just c1Idx, Just c2Idx) -> if c1Idx > c2Idx then GT else LT
+            (Just c1Idx, Nothing) -> GT
+            (Nothing, Just c2Idx) -> LT
+            (Nothing, Nothing) ->
+              if | c1suit == leaderSuit && c2suit == leaderSuit -> compare c1val c2val
+                 | c1suit == leaderSuit && c2suit /= leaderSuit -> GT
+                 | c1suit /= leaderSuit && c2suit == leaderSuit -> LT
+                 | c1suit /= leaderSuit && c2suit /= leaderSuit -> EQ
+
+computeTrumpOrder :: EuchreState -> [(CardValue, Suit)]
+computeTrumpOrder st =
+  let tSuit = st ^. round . trumpSuit
+      leftSuit = case tSuit of
+                   Spades -> Clubs
+                   Diamonds -> Hearts
+                   Hearts -> Diamonds
+                   Clubs -> Spades
+  in
+    [(Nine, tSuit),
+     (Ten, tSuit),
+     (Queen, tSuit),
+     (King, tSuit),
+     (Ace, tSuit),
+     (Jack, leftSuit),
+     (Jack, tSuit)]

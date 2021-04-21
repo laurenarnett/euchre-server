@@ -10,7 +10,8 @@ import Control.Lens
 data Suit = Spades | Diamonds | Hearts | Clubs
   deriving (Show, Eq, Ord, Enum)
 
-data CardValue = Ace | King | Queen | Jack | Ten | Nine
+-- data CardValue = Ace | King | Queen | Jack | Ten | Nine
+data CardValue = Nine | Ten | Jack | Queen | King | Ace
   deriving (Show, Eq, Ord, Enum)
 
 allCards :: [(CardValue, Suit)]
