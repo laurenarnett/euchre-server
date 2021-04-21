@@ -30,6 +30,7 @@ playTrick :: EuchreState -> IO EuchreState
 playTrick st = do
   let leader = st ^. round . leaderPlayer
   broadcast st [i|Player #{leader} starts the next subround.|]
+  broadcastMsgs (map show (viewHands st))
   st' <- foldM playCard st (computePlayerOrder st)
   scoreRound st'
 

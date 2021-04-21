@@ -41,6 +41,11 @@ setHands st [h1, h2, h3, h4] =
        & nthPlayer p3 . hand .~ h3
        & nthPlayer p4 . hand .~ h4
 
+viewHands :: EuchreState -> [Hand]
+viewHands st =
+  let players = computePlayerOrder st in
+    map (\player -> st ^. nthPlayer player . hand) players
+
 computePlayerOrder :: EuchreState -> [Int]
 computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
 
