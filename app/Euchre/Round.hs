@@ -27,29 +27,35 @@ playSubrounds st =
 playTrick :: EuchreState -> IO EuchreState
 playTrick st =
   let players = computePlayerOrder st in
-    foldM go st players
-  where
-    trump = st ^. round . trumpSuit
-    go st player = do
+    foldM playCard st players
 
-playCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
-playCard st card player = do
+playCard :: EuchreState -> Int -> IO EuchreState
+playCard st player = do
   let addr = st ^. nthPlayer player . playerConn
   send addr "Choose a card to play.\n"
   resp <- recv addr 256
   case parse resp of
-    Just card -> playCard st card player
-        broadcast st [i|Player #{player} played #{card}.|]
+    Just card ->
         case st ^. round . leaderCard of -- if the leadercard is already set
-          Just leaderCard -> do
+          Just leaderCard ->
             if validatePlay st card player
-              then pure $ st & nthPlayer player . hand %~ L.delete card
-                             & round . table %~ (card :)
+              then do
+                broadcast st [i|Player #{player} played #{card}.|]
+                let st' = st & nthPlayer player . hand %~ L.delete card -- take from hand
+                             & round . table %~ (card :) -- add to table
+                pure st'
               else do
-                send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit."
-                pure st
-        Nothing -> undefined
-    Nothing -> pure st
+                send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit.\n"
+                playCard st player
+          Nothing -> do
+                broadcast st [i|Player #{player} played #{card}.|]
+                let st' = st & nthPlayer player . hand %~ L.delete card -- take from hand
+                          & round . table %~ (card :) -- add to table
+                          & round . leaderCard ?~ card -- set leaderCard
+                pure st'
+    Nothing -> do
+      sendInvalidInput st player
+      playCard st player
 
 validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
 validatePlay st (_, suit) player =

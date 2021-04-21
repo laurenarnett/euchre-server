@@ -15,11 +15,7 @@ import Data.Char (isSpace)
 import Euchre.Utils
 
 playerConns :: EuchreState -> [Socket]
-playerConns st = [ st ^. team1 . player1 . playerConn
-                 , st ^. team1 . player2 . playerConn
-                 , st ^. team2 . player1 . playerConn
-                 , st ^. team2 . player2 . playerConn
-                 ]
+playerConns st = map (\playerNum -> st ^. nthPlayer playerNum . playerConn) (computePlayerOrder st)
 
 broadcast :: EuchreState -> ByteString -> IO ()
 broadcast st msg = forM_ (playerConns st) $ \conn -> send conn (msg <> "\n")
