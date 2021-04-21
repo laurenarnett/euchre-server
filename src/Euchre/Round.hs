@@ -23,13 +23,13 @@ playSubrounds st =
       let team1Points = st'' ^. team1 . points
           team2Points = st'' ^. team2 . points
           newLeader = st'' ^. round . leaderPlayer
-      broadcast st'' [i|SCORE Team 1: #{team1Points}, Team 2: #{team2Points}|]
-      broadcast st'' [i|Player #{newLeader} starts the next subround.|]
-      -- TODO: replace leaderCard with Nothing, table with []
+      broadcast st'' [i|TRICKS Team 1: #{team1Points}, Team 2: #{team2Points}|]
       playSubrounds st''
 
 playTrick :: EuchreState -> IO EuchreState
 playTrick st = do
+  let leader = st ^. round . leaderPlayer
+  broadcast st [i|Player #{leader} starts the next subround.|]
   st' <- foldM playCard st (computePlayerOrder st)
   scoreRound st'
 

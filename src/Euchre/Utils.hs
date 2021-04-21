@@ -33,12 +33,13 @@ playerToTeam n =
     3 -> team1
     4 -> team2
 
-setHands :: EuchreState -> [Hand] -> [Int] -> EuchreState
-setHands st [h1, h2, h3, h4] [p1, p2, p3, p4] =
-  st & nthPlayer p1 . hand .~ h1
-     & nthPlayer p2 . hand .~ h2
-     & nthPlayer p3 . hand .~ h3
-     & nthPlayer p4 . hand .~ h4
+setHands :: EuchreState -> [Hand] -> EuchreState
+setHands st [h1, h2, h3, h4] =
+  let [p1, p2, p3, p4] = computePlayerOrder st in
+    st & nthPlayer p1 . hand .~ h1
+       & nthPlayer p2 . hand .~ h2
+       & nthPlayer p3 . hand .~ h3
+       & nthPlayer p4 . hand .~ h4
 
 computePlayerOrder :: EuchreState -> [Int]
 computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
