@@ -15,7 +15,7 @@ data CardValue = Nine | Ten | Jack | Queen | King | Ace
   deriving (Show, Eq, Ord, Enum)
 
 allCards :: [(CardValue, Suit)]
-allCards = (,) <$> [Ace .. Nine] <*> [Spades .. Clubs]
+allCards = (,) <$> [Nine .. Ace] <*> [Spades .. Clubs]
 
 type Hand = [(CardValue, Suit)]
 
