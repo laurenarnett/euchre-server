@@ -28,3 +28,13 @@ Input:
 s, d, c, h -> spades, diamonds, clubs, hearts
 
 9, 10, j, q, k, a
+
+
+BUG : Jack of leading suit should not be a vaild play if player has a card of leading suit in her hand
+
+      Player should only be able to play cards from their hand
+      
+      Choose a card to play.
+    Valid plays: [(Nine,Spades),(Ten,Clubs)]9c
+    Player 3 played (Nine,Clubs).
+

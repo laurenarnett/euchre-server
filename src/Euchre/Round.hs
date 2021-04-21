@@ -30,7 +30,7 @@ playTrick :: EuchreState -> IO EuchreState
 playTrick st = do
   let leader = st ^. round . leaderPlayer
   broadcast st [i|Player #{leader} starts the next subround.|]
-  broadcastMsgs st (map show (viewHands st))
+  -- broadcastMsgs st (map (\cards -> [i|Suggested plays: #{cards}|]) (viewHands st))
   st' <- foldM playCard st (computePlayerOrder st)
   st'' <- scoreSubround st'
   pure $ clearSubroundState st''
@@ -39,7 +39,9 @@ playTrick st = do
 playCard :: EuchreState -> Int -> IO EuchreState
 playCard st player = do
   let addr = st ^. nthPlayer player . playerConn
+      h = st ^. nthPlayer player . hand
   send addr "Choose a card to play.\n"
+  send addr [i|Valid plays: #{filterValidCards st h}|]
   resp <- recv addr 256
   case parse resp of
     Just card ->

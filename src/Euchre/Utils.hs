@@ -44,7 +44,16 @@ setHands st [h1, h2, h3, h4] =
 viewHands :: EuchreState -> [Hand]
 viewHands st =
   let players = computePlayerOrder st in
-    map (\player -> st ^. nthPlayer player . hand) players
+    map (\player -> filterValidCards st $ st ^. nthPlayer player . hand) players
+
+filterValidCards :: EuchreState -> Hand -> Hand
+filterValidCards st h =
+  case st ^. round . leaderCard of
+    Just (_,leaderSuit) ->
+      case filter (\(val, suit) -> suit == leaderSuit) h of
+        [] -> h
+        xs -> xs
+    Nothing -> h
 
 computePlayerOrder :: EuchreState -> [Int]
 computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
