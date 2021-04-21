@@ -20,14 +20,13 @@ playSubrounds st =
     _ -> do
       let st' = st & round . subroundNum %~ (+ 1)
       st'' <- playTrick st'
-      broadcast st'' [i|#{st''}|]
       -- TODO: replace leaderCard with Nothing, table with []
       playSubrounds st''
 
 playTrick :: EuchreState -> IO EuchreState
-playTrick st =
-  let players = computePlayerOrder st in
-    foldM playCard st players
+playTrick st = do
+  st' <- foldM playCard st (computePlayerOrder st)
+  scoreRound st'
 
 playCard :: EuchreState -> Int -> IO EuchreState
 playCard st player = do
@@ -65,12 +64,14 @@ validatePlay st (_, suit) player =
       handContainsSuit = leaderSuit `elem` map snd playerHand in
   not handContainsSuit || suit == leaderSuit
 
-scoreRound :: EuchreState -> EuchreState
+scoreRound :: EuchreState -> IO EuchreState
 scoreRound st =
-  let playerOrder = L.reverse $ computePlayerOrder st
-      (winningCard, winningPlayerIndex) =
-        L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder) in
-    st & playerToTeam winningPlayerIndex . points %~ (+ 1) -- TODO: change point value depending on callingTeam
+    do
+      let playerOrder = L.reverse $ computePlayerOrder st
+          (winningCard, winningPlayerIndex) =
+            L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder)
+      broadcast st [i|Player #{winningPlayerIndex}'s #{winningCard} won.|]
+      pure $ st & playerToTeam winningPlayerIndex . points %~ (+ 1) -- TODO: change point value depending on callingTeam
     where
       (leaderValue, leaderSuit) = case st ^. round . leaderCard of
                               Just lCard -> lCard
