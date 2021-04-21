@@ -20,6 +20,11 @@ playSubrounds st =
     _ -> do
       let st' = st & round . subroundNum %~ (+ 1)
       st'' <- playTrick st'
+      let team1Points = st'' ^. team1 . points
+          team2Points = st'' ^. team2 . points
+          newLeader = st'' ^. round . leaderPlayer
+      broadcast st'' [i|SCORE Team 1: #{team1Points}, Team 2: #{team2Points}|]
+      broadcast st'' [i|Player #{newLeader} starts the next subround.|]
       -- TODO: replace leaderCard with Nothing, table with []
       playSubrounds st''
 
@@ -70,8 +75,13 @@ scoreRound st =
       let playerOrder = L.reverse $ computePlayerOrder st
           (winningCard, winningPlayerIndex) =
             L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder)
+          pointsWon = if winningPlayerIndex `mod` 2 == st ^. round . callingTeam
+                      then 1 -- 1 point if player was in the calling team
+                      else 2 -- 2 points if the calling team was the opponent
       broadcast st [i|Player #{winningPlayerIndex}'s #{winningCard} won.|]
-      pure $ st & playerToTeam winningPlayerIndex . points %~ (+ 1) -- TODO: change point value depending on callingTeam
+      pure $ st & playerToTeam winningPlayerIndex . points %~ (+ pointsWon) -- add points to winning team
+                & round . leaderPlayer .~ winningPlayerIndex -- set the leaderPlayer for the next round
+                & round . table .~ [] -- clear the table for the next round
     where
       (leaderValue, leaderSuit) = case st ^. round . leaderCard of
                               Just lCard -> lCard
