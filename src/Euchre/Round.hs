@@ -20,19 +20,21 @@ playSubrounds st =
     _ -> do
       let st' = st & round . subroundNum %~ (+ 1)
       st'' <- playTrick st'
-      let team1Points = st'' ^. team1 . points
-          team2Points = st'' ^. team2 . points
+      let team1Points = st'' ^. team1 . tricksTaken
+          team2Points = st'' ^. team2 . tricksTaken
           newLeader = st'' ^. round . leaderPlayer
-      broadcast st'' [i|TRICKS Team 1: #{team1Points}, Team 2: #{team2Points}|]
+      broadcast st'' [i|TRICKS TAKEN\n  Team 1: #{team1Points}\n  Team 2: #{team2Points}|]
       playSubrounds st''
 
 playTrick :: EuchreState -> IO EuchreState
 playTrick st = do
   let leader = st ^. round . leaderPlayer
   broadcast st [i|Player #{leader} starts the next subround.|]
-  broadcastMsgs (map show (viewHands st))
+  broadcastMsgs st (map show (viewHands st))
   st' <- foldM playCard st (computePlayerOrder st)
-  scoreRound st'
+  st'' <- scoreSubround st'
+  pure $ clearSubroundState st''
+
 
 playCard :: EuchreState -> Int -> IO EuchreState
 playCard st player = do
@@ -50,7 +52,8 @@ playCard st player = do
                              & round . table %~ (card :) -- add to table
                 pure st'
               else do
-                send (st ^. nthPlayer player . playerConn) "Cannot play a card of a different suit if you have one of the leading card's suit.\n"
+                send (st ^. nthPlayer player . playerConn)
+                  [i|"Cannot play a card of a different suit if you have one of #{snd leaderCard}."|]
                 playCard st player
           Nothing -> do
                 broadcast st [i|Player #{player} played #{card}.|]
@@ -70,19 +73,15 @@ validatePlay st (_, suit) player =
       handContainsSuit = leaderSuit `elem` map snd playerHand in
   not handContainsSuit || suit == leaderSuit
 
-scoreRound :: EuchreState -> IO EuchreState
-scoreRound st =
+scoreSubround :: EuchreState -> IO EuchreState
+scoreSubround st =
     do
       let playerOrder = L.reverse $ computePlayerOrder st
           (winningCard, winningPlayerIndex) =
             L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder)
-          pointsWon = if winningPlayerIndex `mod` 2 == st ^. round . callingTeam
-                      then 1 -- 1 point if player was in the calling team
-                      else 2 -- 2 points if the calling team was the opponent
       broadcast st [i|Player #{winningPlayerIndex}'s #{winningCard} won.|]
-      pure $ st & playerToTeam winningPlayerIndex . points %~ (+ pointsWon) -- add points to winning team
+      pure $ st & playerToTeam winningPlayerIndex . tricksTaken %~ (+ 1) -- add trick to winning team
                 & round . leaderPlayer .~ winningPlayerIndex -- set the leaderPlayer for the next round
-                & round . table .~ [] -- clear the table for the next round
     where
       (leaderValue, leaderSuit) = case st ^. round . leaderCard of
                               Just lCard -> lCard
@@ -100,6 +99,11 @@ scoreRound st =
                  | c1suit == leaderSuit && c2suit /= leaderSuit -> GT
                  | c1suit /= leaderSuit && c2suit == leaderSuit -> LT
                  | c1suit /= leaderSuit && c2suit /= leaderSuit -> EQ
+
+clearSubroundState :: EuchreState -> EuchreState
+clearSubroundState st = st
+                           & round . table .~ [] -- clear the table for the next round
+                           & round . leaderCard .~ Nothing
 
 computeTrumpOrder :: EuchreState -> [(CardValue, Suit)]
 computeTrumpOrder st =

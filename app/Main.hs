@@ -49,8 +49,8 @@ mainLoop sock = do
       player2 = Player addr2 conn2 []
       player3 = Player addr3 conn3 []
       player4 = Player addr4 conn4 []
-      team1 = Team player1 player3 0
-      team2 = Team player2 player4 0
+      team1 = Team player1 player3 0 0
+      team2 = Team player2 player4 0 0
       round = Round 0 0 Hearts 1 2 Nothing [] -- dummy initial round state
       euchreState = EuchreState team1 team2 round
     in playEuchre euchreState
@@ -75,10 +75,24 @@ playRound :: EuchreState -> IO EuchreState
 playRound st = do
   [h1, h2, h3, h4, top:kitty] <- dealCards
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
-      st' = setHands st [h1, h2, h3, h4] players
+      st' = setHands st [h1, h2, h3, h4]
   broadcastMsgs st [show h1, show h2, show h3, show h4]
   -- broadcast st' [i|Top card: #{top}|]
   -- st'' <- trumpSelection st' top players
   st''' <- playSubrounds st'
+  scoreRound st'''
 
-  pure st'''
+scoreRound :: EuchreState -> IO EuchreState
+scoreRound st = do
+  let (winningTeamNum, winningTeam) = if | st ^. team1 . tricksTaken > st ^. team2 . tricksTaken -> (1, team1)
+                                         | otherwise -> (2, team2)
+      pointsWon = if | winningTeamNum == st ^. round . callingTeam -> 1 -- 1 point if same team as callingTeam
+                     | otherwise -> 2 -- 2 points if callingTeam was opposing team
+      st' = st & winningTeam . points %~ (+ pointsWon)
+      t1Score = st' ^. team1 . points
+      t2Score = st' ^. team2 . points
+  broadcast st [i|Team #{winningTeamNum} won #{pointsWon} point(s).|]
+  broadcast st [i|SCORE:\n  Team 1: #{t1Score}\n  Team 2: #{t2Score}|]
+  pure st'
+
+-- clearRoundState :: EuchreState -> EuchreState

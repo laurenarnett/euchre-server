@@ -29,6 +29,7 @@ data Player = Player
 data Team = Team
   { _player1 :: Player,
     _player2 :: Player,
+    _tricksTaken :: Int,
     _points :: Int
   }
   deriving (Show)
