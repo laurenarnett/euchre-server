@@ -1,16 +1,38 @@
-# euchre-server
+# Euchre Server
 
-![euchre](./misc/euchre.png)
-![euchre2](./misc/euchre2.png)
+Server for 4-player [Euchre](https://bicyclecards.com/how-to-play/euchre/), built on Haskell's `Network.Socket`.
+
 ![euchre3](./misc/euchre3.png)
 
-4 sockets connect
+## Usage
 
-after 4 connections are made, euchre game starts
+### Start the server:
+``` sh
+cabal run euchre-server
+```
 
-player 1 starts as dealer
+### Connect as client:
+``` sh
+telnet localhost 4242
+```
 
-each round:
+Game begins after 4 connections are successfully made.
+
+### Acceptable card input:
+
+``` sh
+a h # ace of hearts
+cj  # jack of clubs
+qd  # queen of diamonds
+10s # 10 of spades
+...
+etc
+```
+
+`s`, `d`, `c`, `h` -> spades, diamonds, clubs, hearts
+`9`, `10`, `j`, `q`, `k`, `a` -> 9, 10, jack, queen, king, ace
+
+### Each round:
  - [x] deal cards
  - [x] "turn over" top card
  - [x] choose trump suit 
@@ -26,10 +48,6 @@ each round:
    -  [x] 2 points if the other team called it
    -  [ ] 4 points if loner
 
-Input:
 
-s, d, c, h -> spades, diamonds, clubs, hearts
-
-9, 10, j, q, k, a
 
 
