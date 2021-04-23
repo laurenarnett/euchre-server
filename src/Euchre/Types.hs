@@ -6,7 +6,6 @@ module Euchre.Types where
 
 import qualified Prelude as P
 import Relude
-import Relude.Base
 import Control.Lens
 
 data Suit = Spades | Diamonds | Hearts | Clubs
