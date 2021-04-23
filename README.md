@@ -29,8 +29,9 @@ qd  # queen of diamonds
 etc
 ```
 
-`s`, `d`, `c`, `h` -> spades, diamonds, clubs, hearts
-`9`, `10`, `j`, `q`, `k`, `a` -> 9, 10, jack, queen, king, ace
+`s d c h` -> spades, diamonds, clubs, hearts
+
+`9 10 j q k a` -> 9, 10, jack, queen, king, ace
 
 ### Each round:
  - [x] deal cards
