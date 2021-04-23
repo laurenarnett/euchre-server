@@ -40,13 +40,21 @@ playCard :: EuchreState -> Int -> IO EuchreState
 playCard st player = do
   let addr = st ^. nthPlayer player . playerConn
       h = st ^. nthPlayer player . hand
-  send addr "Choose a card to play.\n"
-  send addr [i|Valid plays: #{filterValidCards st h}|]
-  resp <- recv addr 256
-  case parse resp of
-    Just card ->
-        case st ^. round . leaderCard of -- if the leadercard is already set
-          Just leaderCard ->
+      validCards = filterValidCards st h
+  send addr [i|Valid plays:\n  #{filterValidCards st h}\n|]
+  case validCards of
+    [oneCard] -> doPlayCard oneCard
+    _ -> do
+      send addr "Choose a card to play.\n"
+      resp <- recv addr 256
+      case parse resp of
+        Just card -> doPlayCard card
+        Nothing -> do
+          sendInvalidInput st player
+          playCard st player
+  where
+    doPlayCard card = case st ^. round . leaderSuit of -- if the leadercard is already set
+          Just leaderSuit ->
             if validatePlay st card player
               then do
                 broadcast st [i|Player #{player} played #{card}.|]
@@ -55,25 +63,25 @@ playCard st player = do
                 pure st'
               else do
                 send (st ^. nthPlayer player . playerConn)
-                  [i|"Cannot play a card of a different suit if you have one of #{snd leaderCard}."|]
+                  [i|Cannot play #{card} here.\n|]
                 playCard st player
-          Nothing -> do
-                broadcast st [i|Player #{player} played #{card}.|]
-                let st' = st & nthPlayer player . hand %~ L.delete card -- take from hand
-                          & round . table %~ (card :) -- add to table
-                          & round . leaderCard ?~ card -- set leaderCard
-                pure st'
-    Nothing -> do
-      sendInvalidInput st player
-      playCard st player
+          Nothing ->
+            if validatePlay st card player
+            then do
+              broadcast st [i|Player #{player} played #{card}.|]
+              let st' = st & nthPlayer player . hand %~ L.delete card -- take from hand
+                           & round . table %~ (card :) -- add to table
+                           & round . leaderSuit ?~ getSuit st card -- set leaderCard
+              pure st'
+            else do
+              send (st ^. nthPlayer player . playerConn)
+                [i|Cannot play a card that is not in your hand.\n|]
+              playCard st player
 
 validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
-validatePlay st (_, suit) player =
-  let playerHand = st ^. nthPlayer player . hand
-      -- trumpSuit = st ^. round . trumpSuit
-      leaderSuit = st ^?! round . leaderCard . _Just . _2 -- get the Maybe second tuple element, or throw an exception
-      handContainsSuit = leaderSuit `elem` map snd playerHand in
-  not handContainsSuit || suit == leaderSuit
+validatePlay st card player =
+  let playerHand = st ^. nthPlayer player . hand in
+    card `elem` filterValidCards st playerHand
 
 scoreSubround :: EuchreState -> IO EuchreState
 scoreSubround st =
@@ -85,8 +93,7 @@ scoreSubround st =
       pure $ st & playerToTeam winningPlayerIndex . tricksTaken %~ (+ 1) -- add trick to winning team
                 & round . leaderPlayer .~ winningPlayerIndex -- set the leaderPlayer for the next round
     where
-      (leaderValue, leaderSuit) = case st ^. round . leaderCard of
-                              Just lCard -> lCard
+      leadSuit = st ^?! round . leaderSuit . _Just
       trumpOrder = computeTrumpOrder st
       orderCards :: (CardValue, Suit) -> (CardValue, Suit) -> Ordering
       orderCards (c1val, c1suit) (c2val, c2suit) =
@@ -97,29 +104,12 @@ scoreSubround st =
             (Just c1Idx, Nothing) -> GT
             (Nothing, Just c2Idx) -> LT
             (Nothing, Nothing) ->
-              if | c1suit == leaderSuit && c2suit == leaderSuit -> compare c1val c2val
-                 | c1suit == leaderSuit && c2suit /= leaderSuit -> GT
-                 | c1suit /= leaderSuit && c2suit == leaderSuit -> LT
-                 | c1suit /= leaderSuit && c2suit /= leaderSuit -> EQ
+              if | c1suit == leadSuit && c2suit == leadSuit -> compare c1val c2val
+                 | c1suit == leadSuit && c2suit /= leadSuit -> GT
+                 | c1suit /= leadSuit && c2suit == leadSuit -> LT
+                 | c1suit /= leadSuit && c2suit /= leadSuit -> EQ
 
 clearSubroundState :: EuchreState -> EuchreState
 clearSubroundState st = st
                            & round . table .~ [] -- clear the table for the next round
-                           & round . leaderCard .~ Nothing
-
-computeTrumpOrder :: EuchreState -> [(CardValue, Suit)]
-computeTrumpOrder st =
-  let tSuit = st ^. round . trumpSuit
-      leftSuit = case tSuit of
-                   Spades -> Clubs
-                   Diamonds -> Hearts
-                   Hearts -> Diamonds
-                   Clubs -> Spades
-  in
-    [(Nine, tSuit),
-     (Ten, tSuit),
-     (Queen, tSuit),
-     (King, tSuit),
-     (Ace, tSuit),
-     (Jack, leftSuit),
-     (Jack, tSuit)]
+                           & round . leaderSuit .~ Nothing

@@ -42,7 +42,7 @@ data Round = Round
     _trumpSuit :: Suit,
     _callingTeam :: Int,
     _leaderPlayer :: Int,
-    _leaderCard :: Maybe (CardValue, Suit),
+    _leaderSuit :: Maybe Suit,
     _table :: [(CardValue, Suit)]
   }
   deriving (Show)
