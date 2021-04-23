@@ -73,11 +73,12 @@ playEuchre st = do
 
 playRound :: EuchreState -> IO EuchreState
 playRound st = do
-  [h1, h2, h3, h4, top:kitty] <- dealCards
+  [h1, h2, h3, h4, top:kitty] <- dealTestCards -- dealCards
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
       st' = setHands st [h1, h2, h3, h4]
-  -- broadcast st' [i|Top card: #{top}|]
-  -- st'' <- trumpSelection st' top players
+  broadcast st' [i|Top card: #{top}|]
+  broadcastMsgs st' (map (\player -> "Your hand:\n  " <> show (st' ^. nthPlayer player . hand)) players)
+  st'' <- trumpSelection st' top players
   st''' <- playSubrounds st'
   scoreRound st'''
 

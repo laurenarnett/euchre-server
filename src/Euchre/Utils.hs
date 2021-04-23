@@ -18,6 +18,15 @@ dealCards = do
   let chunks = chunksOf 5 cards
   pure chunks
 
+dealTestCards :: IO [Hand]
+dealTestCards = do
+  _ <- shuffleM allCards
+  pure [[(Ace,Hearts),(Nine,Hearts),(Jack,Clubs),(Queen,Diamonds),(King,Diamonds)],
+   [(Ace,Diamonds),(Queen,Hearts),(Jack,Hearts),(Ace,Spades),(Nine,Spades)],
+   [(Jack,Diamonds),(Nine,Diamonds),(Jack,Spades),(Ten,Hearts),(Nine,Clubs)],
+   [(Ten,Spades),(King,Spades),(King,Hearts),(Ace,Clubs),(Queen,Spades)],
+   [(Ten,Clubs),(King,Clubs),(Queen,Clubs),(Ten,Diamonds)]]
+
 nthPlayer :: (Num a, Eq a) => a -> Lens' EuchreState Player
 nthPlayer n = case n of
   1 -> team1 . player1
