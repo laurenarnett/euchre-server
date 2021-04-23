@@ -96,15 +96,11 @@ scoreSubround st =
       orderCards (c1val, c1suit) (c2val, c2suit) =
         let c1TrumpIdx = L.elemIndex (c1val, c1suit) trumpOrder
             c2TrumpIdx = L.elemIndex (c2val, c2suit) trumpOrder in
-          case (c1TrumpIdx, c2TrumpIdx) of
-            (Just c1Idx, Just c2Idx) -> if c1Idx > c2Idx then GT else LT
-            (Just c1Idx, Nothing) -> GT
-            (Nothing, Just c2Idx) -> LT
-            (Nothing, Nothing) ->
+          compare c1TrumpIdx c2TrumpIdx <>
               if | c1suit == leadSuit && c2suit == leadSuit -> compare c1val c2val
                  | c1suit == leadSuit && c2suit /= leadSuit -> GT
                  | c1suit /= leadSuit && c2suit == leadSuit -> LT
-                 | c1suit /= leadSuit && c2suit /= leadSuit -> EQ
+                 | otherwise -> EQ
 
 clearSubroundState :: EuchreState m -> EuchreState m
 clearSubroundState st = st
