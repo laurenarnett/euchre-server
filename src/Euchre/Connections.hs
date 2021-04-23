@@ -8,28 +8,21 @@ import Control.Lens
 import Control.Lens.Regex.ByteString
 import Data.String.Interpolate
 import Euchre.Types
-import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
-import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import qualified Data.ByteString.Char8 as B
 import Data.Char (isSpace)
 import Euchre.Utils
 
-playerConns :: EuchreState -> [Socket]
-playerConns st = map (\playerNum -> st ^. nthPlayer playerNum . playerConn) (computePlayerOrder st)
+playerConns :: EuchreState m -> [ByteString -> m ()]
+playerConns = toListOf (players . tell)
 
-broadcast :: EuchreState -> ByteString -> IO ()
-broadcast st msg = forM_ (playerConns st) $ \conn -> send conn (msg <> "\n")
+broadcast :: Monad m => EuchreState m -> ByteString -> m ()
+broadcast st msg = forMOf_ (players . tell) st (\c -> c (msg <> "\n"))
 
-broadcastMsgs :: EuchreState -> [ByteString] -> IO ()
-broadcastMsgs st [m1, m2, m3, m4] = do
-  let [c1, c2, c3, c4] = playerConns st
-  void $ send c1 (m1 <> "\n")
-  void $ send c2 (m2 <> "\n")
-  void $ send c3 (m3 <> "\n")
-  void $ send c4 (m4 <> "\n")
+broadcastMsgs :: Monad m => EuchreState m -> [ByteString] -> m ()
+broadcastMsgs st = zipWithM_ (\c m -> c (m <> "\n")) (playerConns st)
 
-sendInvalidInput :: EuchreState -> Int -> IO ()
-sendInvalidInput st playerNum = void $ send (st ^. nthPlayer playerNum . playerConn) "Invalid input. Try again.\n"
+sendInvalidInput :: (Monad m) => EuchreState m -> Int -> m ()
+sendInvalidInput st playerNum = (st ^. nthPlayer playerNum . tell) "Invalid input. Try again.\n"
 
 parse :: ByteString -> Maybe (CardValue, Suit)
 parse bs =

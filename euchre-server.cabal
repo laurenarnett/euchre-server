@@ -31,9 +31,11 @@ common shared
   build-depends:
     , base                >=4.13.0.0
     , bytestring
-    , capability
+    -- , capability
+    -- , generic-lens
     , lens
     , lens-regex-pcre
+    , MonadRandom
     , network
     , random-shuffle
     , relude

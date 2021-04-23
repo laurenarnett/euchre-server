@@ -7,6 +7,7 @@ import Control.Lens.Regex.ByteString
 import Control.Concurrent -- forkIO
 import Control.Exception
 import Control.Monad (forever)
+import Control.Monad.Random.Class
 import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
 import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre.Connections
@@ -34,21 +35,29 @@ main = do
 mainLoop :: Socket -> IO ()
 mainLoop sock = do
   (conn1, addr1) <- accept sock
-  _ <- send conn1 "Welcome, you are Player 1\n"
-  _ <- send conn1 [i|Your address is #{addr1}\n|]
+  let tell1 = void . send conn1
+      ask1 = recv conn1 256
+  tell1 "Welcome, you are Player 1\n"
+  tell1 [i|Your address is #{addr1}\n|]
   (conn2, addr2) <- accept sock
-  _ <- send conn2 "Welcome, you are Player 2\n"
-  _ <- send conn2 [i|Your address is #{addr2}\n|]
+  let tell2 = void . send conn2
+      ask2 = recv conn2 256
+  tell2 "Welcome, you are Player 2\n"
+  tell2 [i|Your address is #{addr2}\n|]
   (conn3, addr3) <- accept sock
-  _ <- send conn3 "Welcome, you are Player 3\n"
-  _ <- send conn3 [i|Your address is #{addr3}\n|]
+  let tell3 = void . send conn3
+      ask3 = recv conn3 256
+  tell3 "Welcome, you are Player 3\n"
+  tell3 [i|Your address is #{addr3}\n|]
   (conn4, addr4) <- accept sock
-  _ <- send conn4 "Welcome, you are Player 4\n"
-  _ <- send conn4 [i|Your address is #{addr4}\n|]
-  let player1 = Player addr1 conn1 []
-      player2 = Player addr2 conn2 []
-      player3 = Player addr3 conn3 []
-      player4 = Player addr4 conn4 []
+  let tell4 = void . send conn4
+      ask4 = recv conn4 256
+  tell4 "Welcome, you are Player 4\n"
+  tell4 [i|Your address is #{addr4}\n|]
+  let player1 = Player tell1 ask1 (show addr1) []
+      player2 = Player tell2 ask2 (show addr2) []
+      player3 = Player tell3 ask3 (show addr3) []
+      player4 = Player tell4 ask4 (show addr4) []
       team1 = Team player1 player3 0 0
       team2 = Team player2 player4 0 0
       round = Round 0 0 Hearts 1 2 Nothing [] -- dummy initial round state
@@ -60,7 +69,14 @@ mainLoop sock = do
   close conn3
   close conn4
 
-playEuchre :: EuchreState -> IO ()
+dealCards :: MonadRandom m => m [Hand]
+dealCards = do
+  cards <- shuffleM allCards
+  let chunks = chunksOf 5 cards
+  pure chunks
+
+
+playEuchre :: (MonadRandom m, MonadFail m) => EuchreState m -> m ()
 playEuchre st = do
   let t1points = st ^. team1 . points
       t2points = st ^. team2 . points
@@ -71,17 +87,17 @@ playEuchre st = do
   return ()
   -- playEuchre st'
 
-playRound :: EuchreState -> IO EuchreState
+playRound :: (MonadRandom m, MonadFail m) => EuchreState m -> m (EuchreState m)
 playRound st = do
   [h1, h2, h3, h4, top:kitty] <- dealCards
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
-      st' = setHands st [h1, h2, h3, h4]
+      st' = set hands [h1, h2, h3, h4] st
   -- broadcast st' [i|Top card: #{top}|]
   -- st'' <- trumpSelection st' top players
   st''' <- playSubrounds st'
   scoreRound st'''
 
-scoreRound :: EuchreState -> IO EuchreState
+scoreRound :: Monad m => EuchreState m -> m (EuchreState m)
 scoreRound st = do
   let (winningTeamNum, winningTeam) = if st ^. team1 . tricksTaken > st ^. team2 . tricksTaken
                                       then (1, team1)
