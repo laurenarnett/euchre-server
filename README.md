@@ -1,6 +1,8 @@
 # euchre-server
 
 ![euchre](./misc/euchre.png)
+![euchre2](./misc/euchre2.png)
+![euchre3](./misc/euchre3.png)
 
 4 sockets connect
 
