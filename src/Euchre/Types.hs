@@ -1,10 +1,12 @@
-{-# LANGUAGE TemplateHaskell #-}
 -- |
 
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE RecordWildCards #-}
 module Euchre.Types where
 
+import qualified Prelude as P
 import Relude
-import Network.Socket
+import Relude.Base
 import Control.Lens
 
 data Suit = Spades | Diamonds | Hearts | Clubs
@@ -19,22 +21,23 @@ allCards = (,) <$> [Nine .. Ace] <*> [Spades .. Clubs]
 
 type Hand = [(CardValue, Suit)]
 
-data Player = Player
-  { _playerId :: SockAddr,
-    _playerConn :: Socket,
+data Player m = Player
+  { _tell :: ByteString -> m (),
+    _ask :: m ByteString,
+    _playerId :: ByteString,
     _hand :: Hand
   }
-  deriving (Show)
 
-data Team = Team
-  { _player1 :: Player,
-    _player2 :: Player,
+instance Show (Player m) where
+  show Player {..} = "Player " <> show _playerId <> "(" <> show _hand <> ")"
+
+data Team m = Team
+  { _player1 :: Player m,
+    _player2 :: Player m,
     _tricksTaken :: Int,
     _points :: Int
   }
   deriving (Show)
-
-type PlayerId = SockAddr
 
 data Round = Round
   { _roundNum :: Int,
@@ -47,9 +50,9 @@ data Round = Round
   }
   deriving (Show)
 
-data EuchreState = EuchreState
-  { _team1 :: Team,
-    _team2 :: Team,
+data EuchreState m = EuchreState
+  { _team1 :: Team m,
+    _team2 :: Team m,
     _round :: Round
   }
   deriving (Show)

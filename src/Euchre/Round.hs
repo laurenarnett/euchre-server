@@ -2,7 +2,7 @@
 
 module Euchre.Round where
 
-import Relude hiding (round)
+import Relude hiding (round, ask)
 import Control.Lens
 import Control.Monad
 import Euchre.Connections
@@ -13,22 +13,20 @@ import Network.Socket
 import Network.Socket.ByteString
 import qualified Data.List as L hiding (elem)
 
-playSubrounds :: EuchreState -> IO EuchreState
+playSubrounds :: Monad m => EuchreState m -> m (EuchreState m)
 playSubrounds st =
   case st ^. round . subroundNum of
     5 -> pure st
     _ -> do
-      let st' = st & round . subroundNum %~ (+ 1)
-          players = computePlayerOrder st
-      broadcastMsgs st' (map (\player -> "Your hand:\n  " <> show (st' ^. nthPlayer player . hand)) players)
+      let st' = st & round . subroundNum +~ 1
+      broadcastMsgs st' (st ^.. players . hand . to (\h -> "Your hand:\n  " <> show h))
       st'' <- playTrick st'
       let team1Points = st'' ^. team1 . tricksTaken
           team2Points = st'' ^. team2 . tricksTaken
-          newLeader = st'' ^. round . leaderPlayer
       broadcast st'' [i|TRICKS TAKEN\n  Team 1: #{team1Points}\n  Team 2: #{team2Points}|]
       playSubrounds st''
 
-playTrick :: EuchreState -> IO EuchreState
+playTrick :: Monad m => EuchreState m -> m (EuchreState m)
 playTrick st = do
   let leader = st ^. round . leaderPlayer
   broadcast st [i|Player #{leader} starts the next subround.|]
@@ -37,17 +35,16 @@ playTrick st = do
   pure $ clearSubroundState st''
 
 
-playCard :: EuchreState -> Int -> IO EuchreState
+playCard :: Monad m => EuchreState m -> Int -> m (EuchreState m)
 playCard st player = do
-  let addr = st ^. nthPlayer player . playerConn
-      h = st ^. nthPlayer player . hand
-      validCards = filterValidCards st h
-  send addr [i|Valid plays:\n  #{filterValidCards st h}\n|]
+  let p = st ^. nthPlayer player
+      validCards = filterValidCards st (p ^. hand)
+  (p ^. tell) [i|Valid plays:\n  #{validCards}\n|]
   case validCards of
     [oneCard] -> doPlayCard oneCard
     _ -> do
-      send addr "Choose a card to play.\n"
-      resp <- recv addr 256
+      (p ^. tell) "Choose a card to play.\n"
+      resp <- p^. ask
       case parse resp of
         Just card -> doPlayCard card
         Nothing -> do
@@ -63,8 +60,7 @@ playCard st player = do
                              & round . table %~ (card :) -- add to table
                 pure st'
               else do
-                send (st ^. nthPlayer player . playerConn)
-                  [i|Cannot play #{card} here.\n|]
+                (st ^. nthPlayer player . tell) [i|Cannot play #{card} here.\n|]
                 playCard st player
           Nothing ->
             if validatePlay st card player
@@ -75,19 +71,19 @@ playCard st player = do
                            & round . leaderSuit ?~ getSuit st card -- set leaderCard
               pure st'
             else do
-              send (st ^. nthPlayer player . playerConn)
+              (st ^. nthPlayer player . tell)
                 [i|Cannot play a card that is not in your hand.\n|]
               playCard st player
 
-validatePlay :: EuchreState -> (CardValue, Suit) -> Int -> Bool
+validatePlay :: EuchreState m -> (CardValue, Suit) -> Int -> Bool
 validatePlay st card player =
   let playerHand = st ^. nthPlayer player . hand in
     card `elem` filterValidCards st playerHand
 
-scoreSubround :: EuchreState -> IO EuchreState
+scoreSubround :: Monad m => EuchreState m -> m (EuchreState m)
 scoreSubround st =
     do
-      let playerOrder = L.reverse $ computePlayerOrder st
+      let playerOrder = reverse $ computePlayerOrder st
           (winningCard, winningPlayerIndex) =
             L.maximumBy (\(c1, _) (c2, _) -> orderCards c1 c2) (zip (st ^. round . table) playerOrder)
       broadcast st [i|Player #{winningPlayerIndex}'s #{winningCard} won.|]
@@ -100,17 +96,13 @@ scoreSubround st =
       orderCards (c1val, c1suit) (c2val, c2suit) =
         let c1TrumpIdx = L.elemIndex (c1val, c1suit) trumpOrder
             c2TrumpIdx = L.elemIndex (c2val, c2suit) trumpOrder in
-          case (c1TrumpIdx, c2TrumpIdx) of
-            (Just c1Idx, Just c2Idx) -> if c1Idx > c2Idx then GT else LT
-            (Just c1Idx, Nothing) -> GT
-            (Nothing, Just c2Idx) -> LT
-            (Nothing, Nothing) ->
+          compare c1TrumpIdx c2TrumpIdx <>
               if | c1suit == leadSuit && c2suit == leadSuit -> compare c1val c2val
                  | c1suit == leadSuit && c2suit /= leadSuit -> GT
                  | c1suit /= leadSuit && c2suit == leadSuit -> LT
-                 | c1suit /= leadSuit && c2suit /= leadSuit -> EQ
+                 | otherwise -> EQ
 
-clearSubroundState :: EuchreState -> EuchreState
+clearSubroundState :: EuchreState m -> EuchreState m
 clearSubroundState st = st
                            & round . table .~ [] -- clear the table for the next round
                            & round . leaderSuit .~ Nothing

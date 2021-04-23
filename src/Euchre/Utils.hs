@@ -1,4 +1,5 @@
 -- |
+{-# LANGUAGE ApplicativeDo #-}
 
 module Euchre.Utils where
 
@@ -6,26 +7,18 @@ import Relude hiding (round)
 import Euchre.Types
 import Control.Lens
 import System.Random.Shuffle
-import Data.List.Split
 
 inc :: Int -> Int
 inc player = (player `mod` 4) + 1
 
-
-dealCards :: IO [Hand]
-dealCards = do
-  cards <- shuffleM allCards
-  let chunks = chunksOf 5 cards
-  pure chunks
-
-nthPlayer :: (Num a, Eq a) => a -> Lens' EuchreState Player
+nthPlayer :: (Num a, Eq a) => a -> Lens' (EuchreState m) (Player m)
 nthPlayer n = case n of
   1 -> team1 . player1
   2 -> team2 . player1
   3 -> team1 . player2
   4 -> team2 . player2
 
-playerToTeam :: (Num a, Eq a) => a -> Lens' EuchreState Team
+playerToTeam :: (Num a, Eq a) => a -> Lens' (EuchreState m) (Team m)
 playerToTeam n =
   case n of
     1 -> team1
@@ -33,20 +26,22 @@ playerToTeam n =
     3 -> team1
     4 -> team2
 
-setHands :: EuchreState -> [Hand] -> EuchreState
-setHands st [h1, h2, h3, h4] =
-  let [p1, p2, p3, p4] = computePlayerOrder st in
-    st & nthPlayer p1 . hand .~ h1
-       & nthPlayer p2 . hand .~ h2
-       & nthPlayer p3 . hand .~ h3
-       & nthPlayer p4 . hand .~ h4
+players :: Traversal' (EuchreState m) (Player m)
+players f st = do
+  let [p1, p2, p3, p4] = computePlayerOrder st
+  p1' <- f (st ^. nthPlayer p1)
+  p2' <- f (st ^. nthPlayer p2)
+  p3' <- f (st ^. nthPlayer p3)
+  p4' <- f (st ^. nthPlayer p4)
+  pure $ st & nthPlayer p1 .~ p1'
+            & nthPlayer p2 .~ p2'
+            & nthPlayer p3 .~ p3'
+            & nthPlayer p4 .~ p4'
 
-viewHands :: EuchreState -> [Hand]
-viewHands st =
-  let players = computePlayerOrder st in
-    map (\player -> filterValidCards st $ st ^. nthPlayer player . hand) players
+hands :: Lens' (EuchreState m) [Hand]
+hands = partsOf' (players . hand)
 
-getSuit :: EuchreState -> (CardValue, Suit) -> Suit
+getSuit :: EuchreState m -> (CardValue, Suit) -> Suit
 getSuit st card =
   let tSuit = st ^. round . trumpSuit
       lSuit = getLeftSuit tSuit in
@@ -54,7 +49,7 @@ getSuit st card =
       (Jack, lSuit') | lSuit == lSuit' -> tSuit
       (_,cardSuit) -> cardSuit
 
-filterValidCards :: EuchreState -> Hand -> Hand
+filterValidCards :: EuchreState m -> Hand -> Hand
 filterValidCards st h =
   let tSuit = st ^. round . trumpSuit
       trumpCards = computeTrumpOrder st in
@@ -65,10 +60,10 @@ filterValidCards st h =
           xs -> xs
       Nothing -> h -- player is leader: whole hand is valid
 
-computePlayerOrder :: EuchreState -> [Int]
+computePlayerOrder :: EuchreState m -> [Int]
 computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
 
-computeTrumpOrder :: EuchreState -> [(CardValue, Suit)]
+computeTrumpOrder :: EuchreState m -> [(CardValue, Suit)]
 computeTrumpOrder st =
   let tSuit = st ^. round . trumpSuit
       lSuit = getLeftSuit tSuit

@@ -1,4 +1,4 @@
-cabal-version:      2.4
+cabal-version:      3.0
 name:               euchre-server
 version:            0.1.0.0
 
@@ -24,86 +24,70 @@ version:            0.1.0.0
 -- copyright:
 -- category:
 extra-source-files:
-    CHANGELOG.md
-    README.md
+  CHANGELOG.md
+  README.md
+
+common shared
+  build-depends:
+    , base                >=4.13.0.0
+    , bytestring
+    -- , capability
+    -- , generic-lens
+    , lens
+    , lens-regex-pcre
+    , MonadRandom
+    , network
+    , random-shuffle
+    , relude
+    , split
+    , string-interpolate
+
+  default-language:   Haskell2010
+
+  -- LANGUAGE extensions used by modules in this package.
+  default-extensions:
+    NoImplicitPrelude
+    FlexibleContexts
+    MultiWayIf
+    NumDecimals
+    OverloadedStrings
+    QuasiQuotes
+    RankNTypes
+    TupleSections
 
 library
-    exposed-modules:
-        Euchre.Connections
-        Euchre.Round
-        Euchre.Types
-        Euchre.Trump
-        Euchre.Utils
-    build-depends:    base >=4.13.0.0
-                    , bytestring
-                    , lens
-                    , lens-regex-pcre
-                    , network
-                    , random-shuffle
-                    , relude
-                    , split
-                    , string-interpolate
-    hs-source-dirs: src
-    default-language: Haskell2010
-    default-extensions: NoImplicitPrelude
-                        RankNTypes
-                        QuasiQuotes
-                        OverloadedStrings
-                        TupleSections
-                        FlexibleContexts
-                        NumDecimals
-                        MultiWayIf
+  import:          shared
+
+  -- Modules included in this executable, other than Main.
+  exposed-modules:
+    Euchre.Connections
+    Euchre.Round
+    Euchre.Trump
+    Euchre.Types
+    Euchre.Utils
+
+  hs-source-dirs:  src
 
 executable euchre-server
-    main-is:          Main.hs
-    ghc-options:         -threaded -rtsopts -with-rtsopts=-N
-    -- threaded: not needed for concurrency, but exposes -N rtsopts (runtime system opts) option
-    -- rtsopts=-N: allows threads to run in parallel on a multiprocessor or multicore machine
+  import:         shared
+  main-is:        Main.hs
+  build-depends:  euchre-server
+  ghc-options:    -threaded -rtsopts -with-rtsopts=-N
 
-    -- Modules included in this executable, other than Main.
-
-    -- LANGUAGE extensions used by modules in this package.
-    -- other-extensions:
-    build-depends:    base >=4.13.0.0
-                    , bytestring
-                    , lens
-                    , lens-regex-pcre
-                    , network
-                    , random-shuffle
-                    , relude
-                    , split
-                    , string-interpolate
-                    , euchre-server
-    hs-source-dirs:   app
-    default-language: Haskell2010
-    default-extensions: NoImplicitPrelude
-                        RankNTypes
-                        QuasiQuotes
-                        OverloadedStrings
-                        TupleSections
-                        FlexibleContexts
-                        NumDecimals
-                        MultiWayIf
-
+  -- threaded: not needed for concurrency, but exposes -N rtsopts (runtime system opts) option
+  -- rtsopts=-N: allows threads to run in parallel on a multiprocessor or multicore machine
+  hs-source-dirs: app
 
 test-suite specs
-  type: exitcode-stdio-1.0
-  main-is: Spec.hs
-  other-modules:
-    Euchre.RoundSpec
-
-  default-extensions: NoImplicitPrelude
-                      RankNTypes
-                      QuasiQuotes
-                      OverloadedStrings
-                      TupleSections
-                      FlexibleContexts
-                      NumDecimals
-                      MultiWayIf
-  hs-source-dirs: tests
-  ghc-options:      -Wall -threaded -rtsopts -with-rtsopts=-N
+  import:             shared
+  type:               exitcode-stdio-1.0
+  main-is:            Spec.hs
+  default-language:   Haskell2010
+  other-modules:      Euchre.RoundSpec
+  hs-source-dirs:     tests
+  ghc-options:        -Wall -threaded -rtsopts -with-rtsopts=-N
   build-depends:
     , euchre-server
     , hspec
-    , relude
-  build-tool-depends: hspec-discover:hspec-discover == 2.*
+
+  build-tool-depends: hspec-discover:hspec-discover ==2.*

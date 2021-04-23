@@ -5,14 +5,12 @@ module Euchre.Trump where
 import Control.Lens
 import Euchre.Types
 import Euchre.Connections
-import Relude hiding (round)
+import Relude hiding (round, ask)
 import Data.String.Interpolate
-import Network.Socket -- assumes utf-encoded chars, so incorrectly represents binary data
-import Network.Socket.ByteString -- hence, must also import Network.Socket.ByteString to correctly represent binary data
 import Euchre.Utils
 import Data.List
 
-trumpSelection :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
+trumpSelection :: Monad m => EuchreState m -> (CardValue, Suit) -> [Int] -> m (EuchreState m)
 trumpSelection st top players = do
   -- maybe (chooseYourOwnTrump st top players) pure =<< (offer st top players)
   offerRes <- offer st top players
@@ -20,13 +18,13 @@ trumpSelection st top players = do
     Just st' -> pure st'
     Nothing -> chooseYourOwnTrump st top players
 
-offer :: EuchreState -> (CardValue, Suit) -> [Int] -> IO (Maybe EuchreState)
+offer :: Monad m => EuchreState m -> (CardValue, Suit) -> [Int] -> m (Maybe (EuchreState m))
 offer st top [p1, p2, p3, p4] = offerCard st top p4 p1
 
-offerCard :: EuchreState -> (CardValue, Suit) -> Int -> Int -> IO (Maybe EuchreState)
+offerCard :: Monad m => EuchreState m -> (CardValue, Suit) -> Int -> Int -> m (Maybe (EuchreState m))
 offerCard st top dealer offerer | dealer == offerer = do
   broadcast st [i|Player #{dealer}, would you like to pick it up? [y/n]|]
-  resp <- recv (st ^. nthPlayer dealer . playerConn) 256
+  resp <- st ^. nthPlayer dealer . ask
   case strip resp of
     "n" -> do
       broadcast st [i|Player #{dealer} passed.|]
@@ -39,7 +37,7 @@ offerCard st top dealer offerer | dealer == offerer = do
       offerCard st top dealer offerer
 offerCard st top dealer offerer = do
   broadcast st [i|Player #{offerer}, would you like to tell Player #{dealer} to pick up the card? [y/n]|]
-  resp <- recv (st ^. nthPlayer offerer . playerConn) 256
+  resp <- st ^. nthPlayer offerer . ask
   case strip resp of
     "n" -> do
       broadcast st [i|Player #{offerer} passed.|]
@@ -51,13 +49,13 @@ offerCard st top dealer offerer = do
       sendInvalidInput st offerer
       offerCard st top dealer offerer
 
-chooseYourOwnTrump :: EuchreState -> (CardValue, Suit) -> [Int] -> IO EuchreState
+chooseYourOwnTrump :: Monad m => EuchreState m -> (CardValue, Suit) -> [Int] -> m (EuchreState m)
 chooseYourOwnTrump st (topVal, topSuit) [p1, p2, p3, p4] = offerChoice st topSuit p4 p1
 
-offerChoice :: EuchreState -> Suit -> Int -> Int -> IO EuchreState
+offerChoice :: Monad m => EuchreState m -> Suit -> Int -> Int -> m (EuchreState m)
 offerChoice st topSuit dealer offerer | dealer == offerer = do
   broadcast st [i|Player #{dealer}, which suit would you like? [s/c/d/h]|]
-  resp <- recv (st ^. nthPlayer dealer . playerConn) 256
+  resp <- st ^. nthPlayer dealer . ask
   case validateTrump topSuit resp of
     Just suit -> do
       broadcast st [i|Player #{dealer} chooses #{suit}.|]
@@ -67,7 +65,7 @@ offerChoice st topSuit dealer offerer | dealer == offerer = do
       offerChoice st topSuit dealer offerer
 offerChoice st topSuit dealer offerer = do
   broadcast st [i|Player #{offerer}, which suit would you like? [s/c/d/h/pass]|]
-  resp <- recv (st ^. nthPlayer offerer . playerConn) 256
+  resp <- st ^. nthPlayer offerer . ask
   case strip resp of
     "pass" -> do
       broadcast st [i|Player #{offerer} passed.|]
@@ -87,21 +85,22 @@ validateTrump topSuit resp =
     Just suit | suit /= topSuit -> Just suit
     _ -> Nothing
 
-pickUpCard :: EuchreState -> (CardValue, Suit) -> Int -> IO EuchreState
+pickUpCard :: (Monad m) => EuchreState m -> (CardValue, Suit) -> Int -> m (EuchreState m)
 pickUpCard st top dealerPos = do
-  let dealerConn = st ^. nthPlayer dealerPos . playerConn
-      dealerHand = st ^. nthPlayer dealerPos . hand
-  cardToReplace <- getCardToReplace dealerConn dealerHand
+  cardToReplace <- getCardToReplace dealerHand
   let newHand = top : delete cardToReplace dealerHand
-  send dealerConn [i|This is your new hand: #{newHand}\n|]
+  dealerTell [i|This is your new hand: #{newHand}\n|]
   pure $ st & nthPlayer dealerPos . hand .~ newHand
             & round . trumpSuit .~ snd top
   where
-    getCardToReplace dealerConn dealerHand = do
-      send dealerConn [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]
-      resp <- recv dealerConn 256
+    getCardToReplace dealerHand = do
+      dealerTell [i|This is your hand: #{dealerHand}\nWhich card would you like to replace?\n|]
+      resp <- dealerAsk
       case parse resp of
         Just card -> pure card
         Nothing -> do
-          send dealerConn "Failed to parse card entered. Try again.\n"
-          getCardToReplace dealerConn dealerHand
+          dealerTell "Failed to parse card entered. Try again.\n"
+          getCardToReplace dealerHand
+    dealerTell = st ^. nthPlayer dealerPos . tell
+    dealerAsk = st ^. nthPlayer dealerPos . ask
+    dealerHand = st ^. nthPlayer dealerPos . hand
