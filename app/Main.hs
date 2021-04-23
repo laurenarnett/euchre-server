@@ -35,16 +35,16 @@ mainLoop :: Socket -> IO ()
 mainLoop sock = do
   (conn1, addr1) <- accept sock
   _ <- send conn1 "Welcome, you are Player 1\n"
-  -- _ <- send conn1 [i|your address is: #{addr1}\n|]
+  _ <- send conn1 [i|Your address is #{addr1}\n|]
   (conn2, addr2) <- accept sock
   _ <- send conn2 "Welcome, you are Player 2\n"
-  -- _ <- send conn2 [i|your address is: #{addr2}\n|]
+  _ <- send conn2 [i|Your address is #{addr2}\n|]
   (conn3, addr3) <- accept sock
   _ <- send conn3 "Welcome, you are Player 3\n"
-  -- _ <- send conn3 [i|your address is: #{addr3}\n|]
+  _ <- send conn3 [i|Your address is #{addr3}\n|]
   (conn4, addr4) <- accept sock
   _ <- send conn4 "Welcome, you are Player 4\n"
-  -- _ <- send conn4 [i|your address is: #{addr4}\n|]
+  _ <- send conn4 [i|Your address is #{addr4}\n|]
   let player1 = Player addr1 conn1 []
       player2 = Player addr2 conn2 []
       player3 = Player addr3 conn3 []
@@ -76,7 +76,6 @@ playRound st = do
   [h1, h2, h3, h4, top:kitty] <- dealCards
   let players = take 4 $ iterate inc (st ^. round . leaderPlayer)
       st' = setHands st [h1, h2, h3, h4]
-  broadcastMsgs st [show h1, show h2, show h3, show h4]
   -- broadcast st' [i|Top card: #{top}|]
   -- st'' <- trumpSelection st' top players
   st''' <- playSubrounds st'
@@ -84,10 +83,12 @@ playRound st = do
 
 scoreRound :: EuchreState -> IO EuchreState
 scoreRound st = do
-  let (winningTeamNum, winningTeam) = if | st ^. team1 . tricksTaken > st ^. team2 . tricksTaken -> (1, team1)
-                                         | otherwise -> (2, team2)
-      pointsWon = if | winningTeamNum == st ^. round . callingTeam -> 1 -- 1 point if same team as callingTeam
-                     | otherwise -> 2 -- 2 points if callingTeam was opposing team
+  let (winningTeamNum, winningTeam) = if st ^. team1 . tricksTaken > st ^. team2 . tricksTaken
+                                      then (1, team1)
+                                      else (2, team2)
+      pointsWon = if winningTeamNum == st ^. round . callingTeam
+                  then 1 -- 1 point if same team as callingTeam
+                  else 2 -- 2 points if callingTeam was opposing team
       st' = st & winningTeam . points %~ (+ pointsWon)
       t1Score = st' ^. team1 . points
       t2Score = st' ^. team2 . points

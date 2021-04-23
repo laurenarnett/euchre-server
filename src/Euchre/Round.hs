@@ -19,6 +19,8 @@ playSubrounds st =
     5 -> pure st
     _ -> do
       let st' = st & round . subroundNum %~ (+ 1)
+          players = computePlayerOrder st
+      broadcastMsgs st' (map (\player -> "Your hand:\n  " <> show (st' ^. nthPlayer player . hand)) players)
       st'' <- playTrick st'
       let team1Points = st'' ^. team1 . tricksTaken
           team2Points = st'' ^. team2 . tricksTaken
@@ -30,7 +32,6 @@ playTrick :: EuchreState -> IO EuchreState
 playTrick st = do
   let leader = st ^. round . leaderPlayer
   broadcast st [i|Player #{leader} starts the next subround.|]
-  -- broadcastMsgs st (map (\cards -> [i|Suggested plays: #{cards}|]) (viewHands st))
   st' <- foldM playCard st (computePlayerOrder st)
   st'' <- scoreSubround st'
   pure $ clearSubroundState st''
