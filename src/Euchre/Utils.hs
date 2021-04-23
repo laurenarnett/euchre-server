@@ -46,100 +46,45 @@ viewHands st =
   let players = computePlayerOrder st in
     map (\player -> filterValidCards st $ st ^. nthPlayer player . hand) players
 
+getSuit :: EuchreState -> (CardValue, Suit) -> Suit
+getSuit st card =
+  let tSuit = st ^. round . trumpSuit
+      lSuit = getLeftSuit tSuit in
+    case card of
+      (Jack, lSuit') | lSuit == lSuit' -> tSuit
+      (_,cardSuit) -> cardSuit
+
 filterValidCards :: EuchreState -> Hand -> Hand
 filterValidCards st h =
-  case st ^. round . leaderCard of
-    Just (_,leaderSuit) ->
-      case filter (\(val, suit) -> suit == leaderSuit) h of
-        [] -> h
-        xs -> xs
-    Nothing -> h
+  let tSuit = st ^. round . trumpSuit
+      trumpCards = computeTrumpOrder st in
+    case st ^. round . leaderSuit of
+      Just leadSuit ->
+        case filter (\card -> getSuit st card == leadSuit) h of
+          [] -> h
+          xs -> xs
+      Nothing -> h -- player is leader: whole hand is valid
 
 computePlayerOrder :: EuchreState -> [Int]
 computePlayerOrder st = take 4 $ iterate inc (st ^. round . leaderPlayer)
 
-testState = EuchreState {_team1 = Team
-                                    {_player1 = Player
-                                                  {_playerId = undefined,
-                                                   _playerConn = undefined,
-                                                   _hand = [(Ace,Hearts),
-                                                            (Nine,Hearts),
-                                                            (Jack,Spades),
-                                                            (Nine,Spades),
-                                                            (Ten,Hearts)]},
-                                      _player2 = Player
-                                                   {_playerId = undefined,
-                                                    _playerConn = undefined,
-                                                    _hand = [(Jack,Hearts),
-                                                             (Nine,Clubs),
-                                                             (Jack,Clubs),
-                                                             (Ace,Spades),
-                                                             (Queen,Diamonds)]},
-                                     _points = 0},
-                          _team2 = Team
-                                     {_player1 = Player
-                                                   {_playerId = undefined,
-                                                    _playerConn = undefined,
-                                                    _hand = [(Ace,Diamonds),
-                                                             (Ten,Diamonds),
-                                                             (King,Spades),
-                                                             (Queen,Clubs),
-                                                             (Ace,Clubs)]},
-                                       _player2 = Player
-                                                    {_playerId = undefined,
-                                                     _playerConn = undefined,
-                                                     _hand = [(Nine,Diamonds),
-                                                              (King,Clubs),
-                                                              (Jack,Diamonds),
-                                                              (Queen,Hearts),
-                                                              (King,Hearts)]},
-                                       _points = 0},
-                          _round = Round
-                                     {_roundNum = 1,
-                                      _subroundNum = 0,
-                                      _trumpSuit = Hearts,
-                                      _callingTeam = 1,
-                                      _leaderPlayer = 2,
-                                      _leaderCard = Just (Jack,Hearts),
-                                      _table = [(Jack,Hearts)]}}
+computeTrumpOrder :: EuchreState -> [(CardValue, Suit)]
+computeTrumpOrder st =
+  let tSuit = st ^. round . trumpSuit
+      lSuit = getLeftSuit tSuit
+  in
+    [(Nine, tSuit),
+     (Ten, tSuit),
+     (Queen, tSuit),
+     (King, tSuit),
+     (Ace, tSuit),
+     (Jack, lSuit),
+     (Jack, tSuit)]
 
-testScoreState = EuchreState {_team1 = Team
-                                         {_player1 = Player
-                                                       {_playerId = undefined,
-                                                        _playerConn = undefined,
-                                                        _hand = [(Ace,Hearts),
-                                                                 (Jack,Spades),
-                                                                 (Nine,Spades),
-                                                                 (Ten,Hearts)]},
-                                           _player2 = Player
-                                                        {_playerId = undefined,
-                                                         _playerConn = undefined,
-                                                         _hand = [(Jack,Hearts),
-                                                                  (Jack,Clubs),
-                                                                  (Ace,Spades),
-                                                                  (Queen,Diamonds)]},
-                                          _points = 0},
-                              _team2 = Team
-                                         {_player1 = Player
-                                                       {_playerId = undefined,
-                                                        _playerConn = undefined,
-                                                        _hand = [(Ace,Diamonds),
-                                                                 (Ten,Diamonds),
-                                                                 (King,Spades),
-                                                                 (Queen,Clubs)]},
-                                           _player2 = Player
-                                                        {_playerId = undefined,
-                                                         _playerConn = undefined,
-                                                         _hand = [(Nine,Diamonds),
-                                                                  (Jack,Diamonds),
-                                                                  (Queen,Hearts),
-                                                                  (King,Hearts)]},
-                                           _points = 0},
-                              _round = Round
-                                         {_roundNum = 1,
-                                          _subroundNum = 0,
-                                          _trumpSuit = Hearts,
-                                          _callingTeam = 1,
-                                          _leaderPlayer = 2,
-                                          _leaderCard = Just (Nine, Clubs),
-                                          _table = [(Nine, Clubs), (Ace, Hearts), (King, Spades), (Nine, Spades)]}}
+getLeftSuit :: Suit -> Suit
+getLeftSuit trumpSuit =
+  case trumpSuit of
+    Spades -> Clubs
+    Diamonds -> Hearts
+    Hearts -> Diamonds
+    Clubs -> Spades
