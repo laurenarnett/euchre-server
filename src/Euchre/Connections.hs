@@ -32,13 +32,7 @@ sendInvalidInput :: EuchreState -> Int -> IO ()
 sendInvalidInput st playerNum = void $ send (st ^. nthPlayer playerNum . playerConn) "Invalid input. Try again.\n"
 
 parse :: ByteString -> Maybe (CardValue, Suit)
-parse bs =
-  case parseSuit bs of
-    Just s ->
-      case parseCardValue bs of
-        Just v -> Just (v, s)
-        _ -> Nothing
-    _ -> Nothing
+parse bs = (,) <$> parseCardValue bs <*> parseSuit bs
 
 parseSuit :: ByteString -> Maybe Suit
 parseSuit bs =
